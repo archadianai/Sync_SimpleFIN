@@ -1,0 +1,457 @@
+{
+ "actions": [],
+ "autoname": "SFIN-.####",
+ "creation": "2026-03-23 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_connection",
+  "connection_name",
+  "setup_token",
+  "access_url",
+  "column_break_conn",
+  "is_registered",
+  "enabled",
+  "registration_date",
+  "section_org",
+  "org_domain",
+  "org_name",
+  "org_url",
+  "section_schedule",
+  "sync_frequency",
+  "sync_time",
+  "sync_day_of_week",
+  "sync_day_of_month",
+  "column_break_sched",
+  "retry_count",
+  "retry_interval_minutes",
+  "initial_history_days",
+  "rolling_window_days",
+  "section_pending",
+  "include_pending",
+  "section_enrichment",
+  "extract_reference_number",
+  "custom_reference_regex",
+  "column_break_enrichment",
+  "extract_party_name",
+  "custom_party_regex",
+  "section_notifications",
+  "on_sync_failure",
+  "on_empty_account",
+  "column_break_notif",
+  "on_record_mismatch",
+  "notification_recipients",
+  "section_timezone",
+  "transaction_timezone",
+  "section_mappings",
+  "account_mappings",
+  "section_status",
+  "sync_state",
+  "connection_status",
+  "column_break_status",
+  "last_sync_attempt",
+  "last_sync_status",
+  "last_successful_sync",
+  "next_scheduled_sync",
+  "section_status_detail",
+  "last_sync_end_date",
+  "last_sync_error",
+  "column_break_status2",
+  "retry_attempts_used",
+  "next_retry_at",
+  "rate_limit_paused_until"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_connection",
+   "fieldtype": "Section Break",
+   "label": "Connection Settings"
+  },
+  {
+   "fieldname": "connection_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Connection Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "setup_token",
+   "fieldtype": "Password",
+   "label": "Setup Token",
+   "length": 500,
+   "description": "One-time token from SimpleFIN Bridge. Cleared after successful exchange."
+  },
+  {
+   "fieldname": "access_url",
+   "fieldtype": "Password",
+   "hidden": 1,
+   "label": "Access URL",
+   "length": 500,
+   "read_only": 1,
+   "description": "Encrypted storage of SimpleFIN Access URL (set by system)"
+  },
+  {
+   "fieldname": "column_break_conn",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_registered",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Registered",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "registration_date",
+   "fieldtype": "Datetime",
+   "label": "Registration Date",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_org",
+   "fieldtype": "Section Break",
+   "label": "Organization Info"
+  },
+  {
+   "fieldname": "org_domain",
+   "fieldtype": "Data",
+   "label": "Institution Domain",
+   "read_only": 1
+  },
+  {
+   "fieldname": "org_name",
+   "fieldtype": "Data",
+   "label": "Institution Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "org_url",
+   "fieldtype": "Data",
+   "label": "Institution URL",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_schedule",
+   "fieldtype": "Section Break",
+   "label": "Sync Schedule"
+  },
+  {
+   "default": "Daily",
+   "fieldname": "sync_frequency",
+   "fieldtype": "Select",
+   "label": "Sync Frequency",
+   "options": "Every 2 Hours\n4x Daily\nTwice Daily\nDaily\nWeekly\nBi-Weekly\nMonthly",
+   "reqd": 1
+  },
+  {
+   "default": "02:00",
+   "depends_on": "eval:in_list(['Daily', 'Weekly', 'Bi-Weekly', 'Monthly'], doc.sync_frequency)",
+   "fieldname": "sync_time",
+   "fieldtype": "Time",
+   "label": "Sync Time",
+   "description": ""
+  },
+  {
+   "default": "Monday",
+   "depends_on": "eval:in_list(['Weekly', 'Bi-Weekly'], doc.sync_frequency)",
+   "fieldname": "sync_day_of_week",
+   "fieldtype": "Select",
+   "label": "Sync Day of Week",
+   "options": "Monday\nTuesday\nWednesday\nThursday\nFriday\nSaturday\nSunday"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.sync_frequency == 'Monthly'",
+   "fieldname": "sync_day_of_month",
+   "fieldtype": "Int",
+   "label": "Sync Day of Month",
+   "description": "Day of month (1-28)"
+  },
+  {
+   "fieldname": "column_break_sched",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "3",
+   "fieldname": "retry_count",
+   "fieldtype": "Int",
+   "label": "Retry Count"
+  },
+  {
+   "default": "30",
+   "fieldname": "retry_interval_minutes",
+   "fieldtype": "Int",
+   "label": "Retry Interval (Minutes)"
+  },
+  {
+   "default": "90",
+   "fieldname": "initial_history_days",
+   "fieldtype": "Int",
+   "label": "Initial History Days",
+   "description": "Days of history to pull on first sync or re-enable"
+  },
+  {
+   "default": "14",
+   "fieldname": "rolling_window_days",
+   "fieldtype": "Int",
+   "label": "Rolling Window Days",
+   "description": "Days of overlap on subsequent syncs to catch backdated transactions"
+  },
+  {
+   "fieldname": "section_pending",
+   "fieldtype": "Section Break",
+   "label": "Pending Transactions"
+  },
+  {
+   "default": "0",
+   "fieldname": "include_pending",
+   "fieldtype": "Check",
+   "label": "Include Pending Transactions"
+  },
+  {
+   "fieldname": "section_enrichment",
+   "fieldtype": "Section Break",
+   "label": "Transaction Enrichment"
+  },
+  {
+   "default": "1",
+   "fieldname": "extract_reference_number",
+   "fieldtype": "Check",
+   "label": "Extract Reference Number"
+  },
+  {
+   "depends_on": "eval:doc.extract_reference_number",
+   "fieldname": "custom_reference_regex",
+   "fieldtype": "Small Text",
+   "label": "Custom Reference Regex",
+   "description": "Custom regex with one capture group. Leave blank for built-in patterns."
+  },
+  {
+   "fieldname": "column_break_enrichment",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "extract_party_name",
+   "fieldtype": "Check",
+   "label": "Extract Party Name"
+  },
+  {
+   "depends_on": "eval:doc.extract_party_name",
+   "fieldname": "custom_party_regex",
+   "fieldtype": "Small Text",
+   "label": "Custom Party Regex",
+   "description": "Custom regex with one capture group. Leave blank for built-in patterns."
+  },
+  {
+   "fieldname": "section_notifications",
+   "fieldtype": "Section Break",
+   "label": "Notification Settings"
+  },
+  {
+   "default": "System Notification",
+   "fieldname": "on_sync_failure",
+   "fieldtype": "Select",
+   "label": "On Sync Failure",
+   "options": "Log Only\nEmail\nSystem Notification",
+   "reqd": 1
+  },
+  {
+   "default": "Log Only",
+   "fieldname": "on_empty_account",
+   "fieldtype": "Select",
+   "label": "On Empty Account",
+   "options": "Log Only\nEmail\nSystem Notification",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_notif",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "System Notification",
+   "fieldname": "on_record_mismatch",
+   "fieldtype": "Select",
+   "label": "On Record Mismatch",
+   "options": "Log Only\nEmail\nSystem Notification",
+   "reqd": 1
+  },
+  {
+   "fieldname": "notification_recipients",
+   "fieldtype": "Small Text",
+   "label": "Notification Recipients",
+   "description": "Comma-separated email addresses (used when Email is selected)"
+  },
+  {
+   "fieldname": "section_timezone",
+   "fieldtype": "Section Break",
+   "label": "Timezone"
+  },
+  {
+   "fieldname": "transaction_timezone",
+   "fieldtype": "Select",
+   "label": "Transaction Timezone",
+   "options": "",
+   "reqd": 1,
+   "description": "Your bank's local timezone — used to determine the correct calendar date for each transaction, since SimpleFIN provides timestamps in UTC."
+  },
+  {
+   "fieldname": "section_mappings",
+   "fieldtype": "Section Break",
+   "label": "Account Mappings"
+  },
+  {
+   "fieldname": "account_mappings",
+   "fieldtype": "Table",
+   "label": "Account Mappings",
+   "options": "SimpleFIN Account Mapping"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_status",
+   "fieldtype": "Section Break",
+   "label": "Status"
+  },
+  {
+   "default": "Idle",
+   "fieldname": "sync_state",
+   "fieldtype": "Select",
+   "label": "Sync State",
+   "options": "Idle\nQueued\nSyncing\nRetry Pending\nFailed",
+   "read_only": 1
+  },
+  {
+   "default": "Unknown",
+   "fieldname": "connection_status",
+   "fieldtype": "Select",
+   "label": "Connection Status",
+   "options": "Active\nRevoked\nPayment Required\nRate Limited\nUnknown",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_status",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "last_sync_attempt",
+   "fieldtype": "Datetime",
+   "label": "Last Sync Attempt",
+   "read_only": 1
+  },
+  {
+   "default": "Never Synced",
+   "fieldname": "last_sync_status",
+   "fieldtype": "Select",
+   "label": "Last Sync Status",
+   "options": "Success\nFailed\nNever Synced",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_successful_sync",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Last Successful Sync",
+   "read_only": 1
+  },
+  {
+   "fieldname": "next_scheduled_sync",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Next Scheduled Sync",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_status_detail",
+   "fieldtype": "Section Break",
+   "label": "Status Details",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "last_sync_end_date",
+   "fieldtype": "Int",
+   "label": "Last Sync End Date (UNIX)",
+   "read_only": 1,
+   "description": "UNIX timestamp of the end-date from the last successful data pull"
+  },
+  {
+   "fieldname": "last_sync_error",
+   "fieldtype": "Small Text",
+   "label": "Last Sync Error",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_status2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "retry_attempts_used",
+   "fieldtype": "Int",
+   "label": "Retry Attempts Used",
+   "read_only": 1
+  },
+  {
+   "fieldname": "next_retry_at",
+   "fieldtype": "Datetime",
+   "label": "Next Retry At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "rate_limit_paused_until",
+   "fieldtype": "Datetime",
+   "label": "Rate Limit Paused Until",
+   "read_only": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-03-23 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "SimpleFIN Sync",
+ "name": "SimpleFIN Connection",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Accounts User"
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "connection_name",
+ "track_changes": 1
+}

@@ -1,0 +1,62 @@
+{
+ "actions": [],
+ "creation": "2026-03-23 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "log_retention_days",
+  "default_sync_frequency",
+  "enable_detailed_logging"
+ ],
+ "fields": [
+  {
+   "fieldname": "log_retention_days",
+   "fieldtype": "Int",
+   "label": "Log Retention Days",
+   "default": "90",
+   "description": "Days to keep sync logs before auto-cleanup"
+  },
+  {
+   "fieldname": "default_sync_frequency",
+   "fieldtype": "Select",
+   "label": "Default Sync Frequency",
+   "options": "Every 2 Hours\n4x Daily\nTwice Daily\nDaily\nWeekly\nBi-Weekly\nMonthly",
+   "default": "Daily",
+   "description": "Default frequency for new connections"
+  },
+  {
+   "fieldname": "enable_detailed_logging",
+   "fieldtype": "Check",
+   "label": "Enable Detailed Logging",
+   "default": "0",
+   "description": "Log raw API responses for debugging (disable in production)"
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-03-23 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "SimpleFIN Sync",
+ "name": "SimpleFIN Sync Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Accounts Manager"
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 0
+}

@@ -1,0 +1,240 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-03-23 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "connection",
+  "sync_type",
+  "status",
+  "column_break_basic",
+  "started_at",
+  "completed_at",
+  "section_date_range",
+  "request_start_date",
+  "request_end_date",
+  "column_break_dates",
+  "actual_data_end_date",
+  "section_chunks",
+  "chunks_requested",
+  "chunks_completed",
+  "chunks_empty",
+  "section_counts",
+  "accounts_retrieved",
+  "transactions_retrieved",
+  "column_break_counts",
+  "transactions_created",
+  "transactions_skipped_duplicate",
+  "transactions_skipped_pending",
+  "transactions_skipped_cancelled",
+  "transactions_mismatched",
+  "section_rate_limit",
+  "rate_limit_warning_received",
+  "section_errors",
+  "simplefin_errors",
+  "error_message",
+  "section_balance",
+  "balance_snapshot"
+ ],
+ "fields": [
+  {
+   "fieldname": "connection",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Connection",
+   "options": "SimpleFIN Connection",
+   "reqd": 1
+  },
+  {
+   "fieldname": "sync_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Sync Type",
+   "options": "Scheduled\nManual\nTest",
+   "reqd": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "In Progress\nSuccess\nPartial Success\nFailed",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_basic",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "started_at",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Started At",
+   "reqd": 1
+  },
+  {
+   "fieldname": "completed_at",
+   "fieldtype": "Datetime",
+   "label": "Completed At"
+  },
+  {
+   "fieldname": "section_date_range",
+   "fieldtype": "Section Break",
+   "label": "Date Range"
+  },
+  {
+   "fieldname": "request_start_date",
+   "fieldtype": "Datetime",
+   "label": "Request Start Date"
+  },
+  {
+   "fieldname": "request_end_date",
+   "fieldtype": "Datetime",
+   "label": "Request End Date"
+  },
+  {
+   "fieldname": "column_break_dates",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "actual_data_end_date",
+   "fieldtype": "Datetime",
+   "label": "Actual Data End Date"
+  },
+  {
+   "fieldname": "section_chunks",
+   "fieldtype": "Section Break",
+   "label": "Chunk Details"
+  },
+  {
+   "fieldname": "chunks_requested",
+   "fieldtype": "Int",
+   "label": "Chunks Requested"
+  },
+  {
+   "fieldname": "chunks_completed",
+   "fieldtype": "Int",
+   "label": "Chunks Completed"
+  },
+  {
+   "fieldname": "chunks_empty",
+   "fieldtype": "Int",
+   "label": "Chunks Empty"
+  },
+  {
+   "fieldname": "section_counts",
+   "fieldtype": "Section Break",
+   "label": "Transaction Counts"
+  },
+  {
+   "fieldname": "accounts_retrieved",
+   "fieldtype": "Int",
+   "label": "Accounts Retrieved"
+  },
+  {
+   "fieldname": "transactions_retrieved",
+   "fieldtype": "Int",
+   "label": "Transactions Retrieved"
+  },
+  {
+   "fieldname": "column_break_counts",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "transactions_created",
+   "fieldtype": "Int",
+   "label": "Transactions Created"
+  },
+  {
+   "fieldname": "transactions_skipped_duplicate",
+   "fieldtype": "Int",
+   "label": "Skipped (Duplicate)"
+  },
+  {
+   "fieldname": "transactions_skipped_pending",
+   "fieldtype": "Int",
+   "label": "Skipped (Pending)"
+  },
+  {
+   "fieldname": "transactions_skipped_cancelled",
+   "fieldtype": "Int",
+   "label": "Skipped (Cancelled)"
+  },
+  {
+   "fieldname": "transactions_mismatched",
+   "fieldtype": "Int",
+   "label": "Mismatched"
+  },
+  {
+   "fieldname": "section_rate_limit",
+   "fieldtype": "Section Break",
+   "label": "Rate Limit"
+  },
+  {
+   "default": "0",
+   "fieldname": "rate_limit_warning_received",
+   "fieldtype": "Check",
+   "label": "Rate Limit Warning Received"
+  },
+  {
+   "fieldname": "section_errors",
+   "fieldtype": "Section Break",
+   "label": "Errors"
+  },
+  {
+   "fieldname": "simplefin_errors",
+   "fieldtype": "Small Text",
+   "label": "SimpleFIN Errors"
+  },
+  {
+   "fieldname": "error_message",
+   "fieldtype": "Long Text",
+   "label": "Error Message"
+  },
+  {
+   "fieldname": "section_balance",
+   "fieldtype": "Section Break",
+   "label": "Balance Snapshots"
+  },
+  {
+   "fieldname": "balance_snapshot",
+   "fieldtype": "Table",
+   "label": "Balance Snapshot",
+   "options": "SimpleFIN Balance Snapshot"
+  }
+ ],
+ "links": [],
+ "modified": "2026-03-23 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "SimpleFIN Sync",
+ "name": "SimpleFIN Sync Log",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1
+  },
+  {
+   "read": 1,
+   "role": "Accounts Manager"
+  },
+  {
+   "read": 1,
+   "role": "Accounts User"
+  }
+ ],
+ "sort_field": "started_at",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 0,
+ "title_field": "connection"
+}
