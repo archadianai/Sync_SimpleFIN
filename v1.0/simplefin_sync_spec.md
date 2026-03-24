@@ -1399,6 +1399,93 @@ None — all open questions from the initial spec have been resolved:
 
 ---
 
+## 16. Post-Implementation Notes
+
+The following deviations and additions were discovered during v1.0 implementation (March 2026) against ERPNext v16.11.0 / Frappe v16.12.0.
+
+### 16.1 Frappe v16 API Changes
+
+| Spec Reference | Issue | Resolution |
+|---|---|---|
+| `frappe.get_logger(__name__)` | Removed in Frappe v16 | Use `frappe.logger(__name__)` |
+| `frappe.enqueue(..., deduplicate=True)` | Requires `job_id` parameter in v16 | Added `job_id=f"simplefin_sync_{conn.name}"` |
+| Datetime fields | MariaDB rejects timezone-aware strings (`+00:00`) | All Datetime values use naive UTC: `datetime.utcfromtimestamp()` |
+| Python version | Spec said 3.11+ | Frappe v16 requires **Python 3.14+** (bench image ships 3.14.2) |
+| Node version | Not specified | Frappe v16 requires **Node.js 24+** (bench image ships 24.13.0) |
+
+### 16.2 Additional Fields (Not in Original Spec)
+
+| DocType | Field | Purpose |
+|---|---|---|
+| SimpleFIN Connection | `next_scheduled_sync` (Datetime, read-only) | Computed on save — shows when the next sync will fire. Displayed in list view. |
+
+### 16.3 DocType JSON Deviations
+
+- **Password field length:** `setup_token` and `access_url` require `"length": 500` because SimpleFIN setup tokens are ~240 characters (Frappe Password default max is 140).
+- **Transaction timezone:** The `transaction_timezone` Select field has `"options": ""` in the JSON; options are populated dynamically via a whitelisted method (`get_timezone_options()`) that returns `zoneinfo.available_timezones()`. Default is set in `before_insert` from `System Settings.time_zone`.
+
+### 16.4 Connection Deletion
+
+The spec did not address deleting a SimpleFIN Connection that has associated Sync Logs and Bank Transactions. Implementation adds `ignore_links_on_delete = ["SimpleFIN Sync Log", "Bank Transaction"]` to `hooks.py`, allowing connection deletion while retaining historical records. (Note: the hook value is the **linking** doctype, not the doctype being deleted.)
+
+### 16.5 Guided Registration Workflow
+
+The spec describes the Register button appearing after save. The implementation enhances this with a chained UX flow:
+
+1. **First save** of a new connection with a setup token → prompt: "Register now?"
+2. **Registration** auto-populates the Account Mappings table by fetching accounts via balances-only mode (one extra API call, minimal rate-limit impact)
+3. **Post-registration message** guides the user through: map accounts → check Active → check Enabled → Sync Now
+4. **"Enable & Sync Now" button** appears when the connection is registered and has mapped accounts but is not yet enabled — combines enable + sync in one click
+
+### 16.6 Enrichment Pattern Expansion
+
+The spec's enrichment patterns (Section 5.6) were designed for traditional bank formats (`ACH Payment - Vendor`). Real credit union data (BECU) uses a different format (`POS Withdrawal MERCHANT ADDRESS CITY STZIP`). The implementation expands patterns to handle both:
+
+**Additional prefixes:**
+- `POS/ATM/External/Internal/New Account` + `Withdrawal/Deposit/Transfer/Credit/Debit/Payment`
+- These cover BECU, USAA, Navy Federal, STCU, and most US credit union descriptions
+
+**Address tail removal:**
+- Street addresses starting with numbers (`4141 Hacienda Drive PLEASANTON CAU`)
+- PO Box addresses (`PO Box 7081 CHESTNUT MOUNGAUS`)
+- City/state blocks with excess whitespace
+- Embedded trace numbers (`ONLNE TRNSFR88871085`)
+
+**Merchant cleanup:**
+- `BRAND* BRAND-REAL NAME` → `REAL NAME` (e.g., `ZOHO* ZOHO-ZOHO CORP` → `Zoho Corp`)
+- `ACCT VERIFY` suffix stripping
+
+**Reference number extraction addition:**
+- Embedded transfer numbers: `TRNSFR88871085` → `88871085`
+
+**Whitespace normalization:**
+- Excess spaces (common in credit union descriptions) collapsed before pattern matching
+
+### 16.7 Workspace Format
+
+Frappe v16 workspaces require a `content` field containing JSON-encoded block definitions (`header`, `spacer`, `card` types). The `links` array uses `"type": "Card Break"` entries as group headers with `"type": "Link"` entries beneath. A workspace with only top-level `links` and `shortcuts` (no content blocks) renders as blank gray boxes.
+
+### 16.8 Timezone Configuration
+
+Frappe stores timezone in three layered locations. The boot info sends both `system` and `user` timezone; the client uses the **user** value for display:
+
+1. `System Settings.time_zone` — the DocType field
+2. `tabDefaultValue` (`defkey='time_zone'`, `parent='__default'`) — system default
+3. `User.time_zone` — per-user field on the User doctype (**takes priority**)
+
+Frappe seeds Administrator and Guest with `Asia/Kolkata` by default. All three layers must be set during programmatic setup to avoid display inconsistencies.
+
+### 16.9 Automatic Party Matching
+
+ERPNext's `enable_party_matching` (Accounts Settings > Others tab) runs in `before_submit` on Bank Transaction. It fuzzy-matches `bank_party_name` against existing Customer/Supplier/Employee names. Key points:
+
+- Only triggers on **newly submitted** transactions, not retroactively
+- Requires the party to already exist in ERPNext
+- The `bank_party_name` field has `allow_on_submit=0` (read-only after submission) — this is by design; users correct matching via `party_type` and `party` fields which are editable
+- The Sync Time field description dynamically shows the system timezone from `frappe.boot.time_zone.system`
+
+---
+
 ## 16. Code Standards & Attribution
 
 ### Coding Standards

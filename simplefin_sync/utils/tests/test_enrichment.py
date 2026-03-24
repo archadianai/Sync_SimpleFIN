@@ -85,6 +85,15 @@ class TestExtractReferenceNumber(FrappeTestCase):
 			"TR12345",
 		)
 
+	def test_embedded_trnsfr_number(self):
+		"""BECU-style embedded transfer number."""
+		self.assertEqual(
+			extract_reference_number(
+				"External Deposit STEVEN BOURG ONLNE TRNSFR88871085 - P2P", None
+			),
+			"88871085",
+		)
+
 	def test_no_match(self):
 		"""No reference found returns None."""
 		self.assertIsNone(
@@ -112,15 +121,13 @@ class TestExtractReferenceNumber(FrappeTestCase):
 class TestExtractPartyName(FrappeTestCase):
 	"""Tests for extract_party_name()."""
 
+	# --- Traditional bank formats ---
+
 	def test_ach_payment(self):
 		self.assertEqual(
 			extract_party_name("ACH Payment - Acme Corporation"),
 			"Acme Corporation",
 		)
-
-	def test_pos_purchase(self):
-		result = extract_party_name("POS Purchase COSTCO #1234 SEATTLE WA")
-		self.assertEqual(result, "Costco")
 
 	def test_wire_transfer(self):
 		self.assertEqual(
@@ -136,8 +143,61 @@ class TestExtractPartyName(FrappeTestCase):
 		result = extract_party_name("ACH Payment - AMAZON.COM")
 		self.assertEqual(result, "Amazon.Com")
 
+	def test_mixed_case_preserved(self):
+		"""Mixed-case results are NOT title-cased."""
+		result = extract_party_name("ACH Payment - McDonald's")
+		self.assertEqual(result, "McDonald's")
+
+	# --- Credit union / BECU-style formats ---
+
+	def test_pos_withdrawal_with_address(self):
+		"""BECU: POS Withdrawal + merchant + PO Box address."""
+		result = extract_party_name(
+			"POS Withdrawal SIMPLEFIN BRIDGE PO Box 7081            CHESTNUT MOUNGAUS"
+		)
+		self.assertEqual(result, "Simplefin Bridge")
+
+	def test_pos_withdrawal_with_street_address(self):
+		"""BECU: POS Withdrawal + merchant + street address."""
+		result = extract_party_name(
+			"POS Withdrawal ZOHO* ZOHO-ZOHO CORP 4141 Hacienda Drive    PLEASANTON   CAU"
+		)
+		self.assertEqual(result, "Zoho Corp")
+
+	def test_external_deposit_with_trace(self):
+		"""BECU: External Deposit + person + embedded trace number."""
+		result = extract_party_name(
+			"External Deposit STEVEN BOURG ONLNE TRNSFR88871085 - P2P"
+		)
+		self.assertEqual(result, "Steven Bourg")
+
+	def test_external_deposit_acct_verify(self):
+		"""BECU: Account verification deposits."""
+		result = extract_party_name(
+			"External Deposit BECU ACCT VERIFY 88871085 - ACCTVERIFY"
+		)
+		self.assertEqual(result, "Becu")
+
+	def test_atm_deposit(self):
+		"""BECU: ATM Deposit at a specific location."""
+		result = extract_party_name(
+			"ATM Deposit STCU 106 S 2ND ST E         CHEWELAH     WAUS"
+		)
+		self.assertEqual(result, "Stcu")
+
+	def test_new_account_welcome(self):
+		"""BECU: Welcome deposit — no meaningful party."""
+		self.assertIsNone(
+			extract_party_name("New Account Deposit Welcome to BECU")
+		)
+
+	def test_pos_purchase_with_store_number(self):
+		result = extract_party_name("POS Withdrawal COSTCO #1234 SEATTLE WA")
+		self.assertEqual(result, "Costco")
+
+	# --- No-party descriptions ---
+
 	def test_no_party_check(self):
-		"""Check-only descriptions return None."""
 		self.assertIsNone(extract_party_name("Check #1042"))
 
 	def test_no_party_interest(self):
@@ -149,6 +209,8 @@ class TestExtractPartyName(FrappeTestCase):
 	def test_no_party_service_charge(self):
 		self.assertIsNone(extract_party_name("Service Charge"))
 
+	# --- Edge cases ---
+
 	def test_none_description(self):
 		self.assertIsNone(extract_party_name(None))
 
@@ -159,10 +221,10 @@ class TestExtractPartyName(FrappeTestCase):
 		"""Results shorter than 3 chars return None."""
 		self.assertIsNone(extract_party_name("ACH Payment - AB"))
 
-	def test_mixed_case_preserved(self):
-		"""Mixed-case results are NOT title-cased."""
-		result = extract_party_name("ACH Payment - McDonald's")
-		self.assertEqual(result, "McDonald's")
+	def test_excess_whitespace_normalized(self):
+		"""Multiple spaces are collapsed before processing."""
+		result = extract_party_name("POS Withdrawal   SOME MERCHANT   CITY     STUS")
+		self.assertIsNotNone(result)
 
 
 # ---------------------------------------------------------------------------

@@ -41,7 +41,7 @@ Every `.py` and `.js` file must start with:
 - Type hints on all public method signatures.
 - Docstrings on all public methods and classes (Google style).
 - Use `frappe._()` for ALL user-facing strings (translation support).
-- Use `frappe.get_logger(__name__)` for logging, never `print()`.
+- Use `frappe.logger(__name__)` for logging, never `print()`. (Note: `get_logger` was removed in Frappe v16.)
 - Use `frappe.db` ORM methods, never raw SQL except for performance-critical dedup queries (as specified in Section 5.3 of the spec).
 - Use `Decimal` (from Python `decimal` module) for parsing SimpleFIN amounts. Never `float`.
 
@@ -74,7 +74,7 @@ Every `.py` and `.js` file must start with:
 - Register in `hooks.py` under `scheduler_events`.
 - The `"all"` event runs every ~60 seconds on Frappe Cloud.
 - Long-running work must be enqueued: `frappe.enqueue(..., queue="long")`.
-- Always use `deduplicate=True` on enqueue to prevent duplicate jobs.
+- Always use `deduplicate=True` on enqueue to prevent duplicate jobs. Frappe v16 also requires `job_id` when deduplicating.
 
 ### Testing
 - Test files go in each doctype directory: `test_simplefin_connection.py`, etc.
@@ -270,7 +270,7 @@ Follow this order strictly. Complete and verify each phase before starting the n
    - Include the manual recovery procedure for accidentally cancelled transactions (delete + re-sync).
 3. **Verify all file headers** have the copyright/attribution notice.
 4. **Verify `hooks.py`** has all required entries (after_install, scheduler_events, doc_events).
-5. **Verify `setup.py` / `setup.cfg`** are correctly configured for Frappe Marketplace.
+5. **Verify `pyproject.toml`** is correctly configured for Frappe Marketplace. (Frappe v16 uses `pyproject.toml` with `flit_core`, not `setup.py`/`setup.cfg`.)
 
 ## Common Pitfalls to Avoid
 
@@ -325,6 +325,7 @@ frappe.enqueue(
     connection=connection_name,
     queue="long",
     deduplicate=True,
+    job_id=f"simplefin_sync_{connection_name}",
     timeout=600,  # 10 minutes max
 )
 
@@ -390,6 +391,10 @@ scheduler_events = {
         "simplefin_sync.tasks.cleanup_old_sync_logs"
     ]
 }
+
+# Allow deleting connections while retaining historical sync logs and bank transactions.
+# Value is the linking doctype (the one with the Link field), not the doctype being deleted.
+ignore_links_on_delete = ["SimpleFIN Sync Log", "Bank Transaction"]
 
 doc_events = {
     "Bank Transaction": {
