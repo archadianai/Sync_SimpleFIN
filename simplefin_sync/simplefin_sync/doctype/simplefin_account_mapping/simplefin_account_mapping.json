@@ -26,29 +26,34 @@
    "fieldname": "simplefin_org_name",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Institution Name"
+   "label": "Institution Name",
+   "read_only": 1
   },
   {
    "fieldname": "simplefin_account_name",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Account Name"
+   "label": "Account Name",
+   "read_only": 1
   },
   {
    "fieldname": "simplefin_account_id",
    "fieldtype": "Data",
    "label": "SimpleFIN Account ID",
+   "read_only": 1,
    "reqd": 1
   },
   {
    "fieldname": "simplefin_org_domain",
    "fieldtype": "Data",
-   "label": "Institution Domain"
+   "label": "Institution Domain",
+   "read_only": 1
   },
   {
    "fieldname": "simplefin_currency",
    "fieldtype": "Data",
-   "label": "Currency"
+   "label": "Currency",
+   "read_only": 1
   },
   {
    "fieldname": "erpnext_bank_account",
@@ -99,17 +104,20 @@
    "default": "0",
    "fieldname": "missing_from_simplefin",
    "fieldtype": "Check",
-   "label": "Missing from SimpleFIN"
+   "label": "Missing from SimpleFIN",
+   "read_only": 1
   },
   {
    "fieldname": "first_seen",
    "fieldtype": "Datetime",
-   "label": "First Seen"
+   "label": "First Seen",
+   "read_only": 1
   },
   {
    "fieldname": "last_seen",
    "fieldtype": "Datetime",
-   "label": "Last Seen"
+   "label": "Last Seen",
+   "read_only": 1
   }
  ],
  "istable": 1,
