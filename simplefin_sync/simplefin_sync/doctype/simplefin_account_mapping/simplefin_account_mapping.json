@@ -5,10 +5,10 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "simplefin_account_id",
-  "simplefin_account_name",
-  "simplefin_org_domain",
   "simplefin_org_name",
+  "simplefin_account_name",
+  "simplefin_account_id",
+  "simplefin_org_domain",
   "simplefin_currency",
   "erpnext_bank_account",
   "is_active",
@@ -23,11 +23,10 @@
  ],
  "fields": [
   {
-   "fieldname": "simplefin_account_id",
+   "fieldname": "simplefin_org_name",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "SimpleFIN Account ID",
-   "reqd": 1
+   "label": "Institution Name"
   },
   {
    "fieldname": "simplefin_account_name",
@@ -36,15 +35,15 @@
    "label": "Account Name"
   },
   {
+   "fieldname": "simplefin_account_id",
+   "fieldtype": "Data",
+   "label": "SimpleFIN Account ID",
+   "reqd": 1
+  },
+  {
    "fieldname": "simplefin_org_domain",
    "fieldtype": "Data",
    "label": "Institution Domain"
-  },
-  {
-   "fieldname": "simplefin_org_name",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "Institution Name"
   },
   {
    "fieldname": "simplefin_currency",
