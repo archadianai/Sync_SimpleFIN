@@ -6,21 +6,6 @@ const CONN_METHOD =
 	"simplefin_sync.simplefin_sync.doctype.simplefin_connection.simplefin_connection";
 
 frappe.ui.form.on("SimpleFIN Connection", {
-	setup(frm) {
-		// Fetch timezone list once and cache on the form object
-		if (!frm._tz_options) {
-			frappe.call({
-				method: CONN_METHOD + ".get_timezone_options",
-				async: false,
-				callback(r) {
-					if (r.message) {
-						frm._tz_options = r.message.join("\n");
-					}
-				},
-			});
-		}
-	},
-
 	after_save(frm) {
 		// Only prompt on first save (creation) of an unregistered connection
 		// that has a setup token.
@@ -131,23 +116,6 @@ frappe.ui.form.on("SimpleFIN Connection", {
 			frm.dashboard.set_headline_alert(
 				'<span class="indicator whitespace-nowrap red">' + __("Unregistered") + "</span>"
 			);
-		}
-	},
-});
-
-// Populate timezone options on Account Mapping child table rows
-frappe.ui.form.on("SimpleFIN Account Mapping", {
-	form_render(frm, cdt, cdn) {
-		if (frm._tz_options) {
-			let row = locals[cdt][cdn];
-			let grid_row = frm.fields_dict.account_mappings.grid.grid_rows_by_docname[cdn];
-			if (grid_row) {
-				let tz_field = grid_row.get_field("transaction_timezone");
-				if (tz_field) {
-					tz_field.df.options = frm._tz_options;
-					tz_field.refresh();
-				}
-			}
 		}
 	},
 });

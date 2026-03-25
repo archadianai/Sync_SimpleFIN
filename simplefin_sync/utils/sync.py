@@ -235,7 +235,6 @@ def _do_sync(conn, sync_log) -> None:
 
 				result = _process_transaction(
 					txn, acct_id, mapping.erpnext_bank_account, conn,
-					mapping.transaction_timezone,
 				)
 				if result == "created":
 					chunk_created += 1
@@ -353,7 +352,6 @@ def _process_transaction(
 	account_id: str,
 	bank_account: str,
 	conn,
-	tz_name: str | None = None,
 ) -> str:
 	"""Process a single transaction. Returns 'created', 'duplicate', 'cancelled', or 'mismatch'."""
 	txn_id = txn.get("id")
@@ -408,7 +406,7 @@ def _process_transaction(
 
 		new_deposit = float(abs(amount)) if amount > 0 else 0
 		new_withdrawal = float(abs(amount)) if amount < 0 else 0
-		posted_date = _unix_to_date(posted, tz_name)
+		posted_date = _unix_to_date(posted)
 
 		differences = []
 		if str(record.date) != str(posted_date):
@@ -437,7 +435,7 @@ def _process_transaction(
 	withdrawal = float(abs(amount)) if amount < 0 else 0.0
 	abs_amount = float(abs(amount))
 
-	posted_date = _unix_to_date(posted, tz_name)
+	posted_date = _unix_to_date(posted)
 	sanitized_desc = frappe.utils.escape_html(description)[:500] if description else ""
 
 	# Enrichment
@@ -493,7 +491,6 @@ def _update_account_mappings(conn, accounts: list[dict]) -> None:
 	"""Auto-discover new SimpleFIN accounts and update existing mappings."""
 	existing_ids = {m.simplefin_account_id for m in (conn.account_mappings or [])}
 	now = now_datetime()
-	default_tz = frappe.db.get_single_value("System Settings", "time_zone") or "UTC"
 	changed = False
 
 	for acct in accounts:
@@ -519,7 +516,6 @@ def _update_account_mappings(conn, accounts: list[dict]) -> None:
 				"simplefin_org_domain": org.get("domain", ""),
 				"simplefin_org_name": org.get("name", ""),
 				"simplefin_currency": acct.get("currency", ""),
-				"transaction_timezone": default_tz,
 				"is_active": 0,
 				"first_seen": now,
 				"last_seen": now,
@@ -631,16 +627,10 @@ def _create_sync_log(conn, sync_type: str):
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _unix_to_date(timestamp: int, tz_name: str | None = None):
-	"""Convert a UNIX timestamp to a Python date using the given timezone."""
-	if tz_name:
-		from zoneinfo import ZoneInfo
+def _unix_to_date(timestamp: int):
+	"""Convert a UNIX timestamp to a Python date (UTC).
 
-		try:
-			tz = ZoneInfo(tz_name)
-			return datetime.fromtimestamp(timestamp, tz=tz).date()
-		except (KeyError, Exception):
-			pass
-
-	# Default: UTC (naive)
+	SimpleFIN Bridge normalises posted timestamps to noon UTC, so timezone
+	conversion is unnecessary — the UTC date is always the correct calendar date.
+	"""
 	return datetime.utcfromtimestamp(timestamp).date()

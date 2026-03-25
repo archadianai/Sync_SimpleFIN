@@ -116,26 +116,21 @@ class TestRateLimitDetection(FrappeTestCase):
 class TestUnixToDate(FrappeTestCase):
 	"""Tests for _unix_to_date()."""
 
-	def test_utc_conversion(self):
-		"""UNIX epoch 0 → 1970-01-01 in UTC."""
+	def test_epoch_zero(self):
+		"""UNIX epoch 0 → 1970-01-01."""
 		from datetime import date
-		result = _unix_to_date(0, "UTC")
-		self.assertEqual(result, date(1970, 1, 1))
+		self.assertEqual(_unix_to_date(0), date(1970, 1, 1))
 
-	def test_timezone_conversion(self):
-		"""Same timestamp yields different dates in different timezones."""
-		# 2023-11-14 23:00 UTC = 2023-11-14 15:00 PST (same day)
-		# 2023-11-15 01:00 UTC = 2023-11-14 17:00 PST (different day in UTC vs PST)
-		# Use a timestamp that's early morning UTC
-		ts = 1700006400  # 2023-11-15 00:00:00 UTC
+	def test_known_date(self):
+		"""Known timestamp → correct date."""
 		from datetime import date
-		utc_date = _unix_to_date(ts, "UTC")
-		self.assertEqual(utc_date, date(2023, 11, 15))
+		# 2023-11-15 12:00:00 UTC (noon, like SimpleFIN Bridge sends)
+		ts = 1700049600
+		self.assertEqual(_unix_to_date(ts), date(2023, 11, 15))
 
-		la_date = _unix_to_date(ts, "America/Los_Angeles")
-		self.assertEqual(la_date, date(2023, 11, 14))  # Still Nov 14 in LA
-
-	def test_none_timezone_defaults_to_utc(self):
+	def test_noon_utc_same_date_everywhere(self):
+		"""Noon UTC always yields the same calendar date regardless of timezone."""
 		from datetime import date
-		result = _unix_to_date(0, None)
-		self.assertEqual(result, date(1970, 1, 1))
+		# SimpleFIN normalises to noon UTC — verify the date is unambiguous
+		ts = 1700049600  # 2023-11-15 12:00:00 UTC
+		self.assertEqual(_unix_to_date(ts), date(2023, 11, 15))

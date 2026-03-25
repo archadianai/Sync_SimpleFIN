@@ -190,14 +190,6 @@ def _next_weekday(now, day_name: str, hour: int, minute: int):
 # ---------------------------------------------------------------------------
 
 @frappe.whitelist()
-def get_timezone_options() -> list[str]:
-	"""Return a sorted list of all available IANA timezones."""
-	from zoneinfo import available_timezones
-
-	return sorted(available_timezones())
-
-
-@frappe.whitelist()
 def register_token(connection: str) -> None:
 	"""Exchange the setup token for an access URL and store it encrypted."""
 	from simplefin_sync.utils.simplefin_client import (
@@ -378,7 +370,6 @@ def _populate_account_mappings(conn, client) -> None:
 
 	existing_ids = {m.simplefin_account_id for m in (conn.account_mappings or [])}
 	now = now_datetime()
-	default_tz = frappe.db.get_single_value("System Settings", "time_zone") or "UTC"
 	changed = False
 
 	# Update org info
@@ -400,7 +391,6 @@ def _populate_account_mappings(conn, client) -> None:
 			"simplefin_org_domain": acct_org.get("domain", ""),
 			"simplefin_org_name": acct_org.get("name", ""),
 			"simplefin_currency": acct.get("currency", ""),
-			"transaction_timezone": default_tz,
 			"is_active": 0,
 			"first_seen": now,
 			"last_seen": now,

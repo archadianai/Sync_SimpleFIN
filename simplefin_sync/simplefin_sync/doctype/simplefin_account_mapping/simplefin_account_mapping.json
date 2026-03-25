@@ -10,7 +10,6 @@
   "simplefin_org_domain",
   "simplefin_org_name",
   "simplefin_currency",
-  "transaction_timezone",
   "erpnext_bank_account",
   "is_active",
   "missing_from_simplefin",
@@ -45,13 +44,6 @@
    "fieldname": "simplefin_currency",
    "fieldtype": "Data",
    "label": "Currency"
-  },
-  {
-   "fieldname": "transaction_timezone",
-   "fieldtype": "Select",
-   "label": "Transaction Timezone",
-   "options": "",
-   "description": "Bank's local timezone for converting transaction timestamps to calendar dates"
   },
   {
    "fieldname": "erpnext_bank_account",
