@@ -30,6 +30,12 @@ frappe.ui.form.on("SimpleFIN Connection", {
 			);
 		}
 
+		// Disable duplicate row on Account Mappings grid
+		if (frm.fields_dict.account_mappings) {
+			frm.fields_dict.account_mappings.grid.cannot_add_rows = false;
+			frm.fields_dict.account_mappings.grid.grid_buttons.find(".grid-duplicate-row").hide();
+		}
+
 		// Show the system timezone on the Sync Time field description
 		let sys_tz = frappe.boot.time_zone?.system || frappe.sys_defaults?.time_zone || "";
 		if (sys_tz && frm.fields_dict.sync_time) {
