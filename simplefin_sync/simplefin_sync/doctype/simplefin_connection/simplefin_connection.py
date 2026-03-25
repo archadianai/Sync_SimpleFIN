@@ -190,6 +190,44 @@ def _next_weekday(now, day_name: str, hour: int, minute: int):
 # ---------------------------------------------------------------------------
 
 @frappe.whitelist()
+def reregister(connection: str, setup_token: str) -> None:
+	"""Re-register a revoked connection with a new setup token.
+
+	Preserves all existing settings, mappings, and sync history.
+	Only replaces the access_url credential.
+	"""
+	from simplefin_sync.utils.simplefin_client import (
+		SimpleFINAuthError,
+		SimpleFINClient,
+		SimpleFINError,
+	)
+
+	conn = frappe.get_doc("SimpleFIN Connection", connection)
+
+	if conn.connection_status != "Revoked":
+		frappe.throw(_("Re-register is only available for revoked connections."))
+
+	try:
+		access_url = SimpleFINClient.claim_access_url(setup_token.strip())
+	except SimpleFINAuthError:
+		frappe.throw(
+			_(
+				"This setup token has already been used or is compromised. "
+				"Please generate a new token from SimpleFIN Bridge."
+			)
+		)
+	except SimpleFINError as e:
+		frappe.throw(_("Registration failed: {0}").format(str(e)))
+
+	conn.access_url = access_url
+	conn.connection_status = "Active"
+	conn.registration_date = now_datetime()
+	conn.enabled = 1
+	conn.save(ignore_permissions=True)
+	frappe.db.commit()
+
+
+@frappe.whitelist()
 def register_token(connection: str) -> None:
 	"""Exchange the setup token for an access URL and store it encrypted."""
 	from simplefin_sync.utils.simplefin_client import (

@@ -73,6 +73,7 @@
    "reqd": 1
   },
   {
+   "depends_on": "eval:!doc.is_registered || doc.connection_status === 'Revoked'",
    "fieldname": "setup_token",
    "fieldtype": "Password",
    "label": "Setup Token",

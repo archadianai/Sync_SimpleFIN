@@ -38,10 +38,15 @@ frappe.ui.form.on("SimpleFIN Connection", {
 			frm.refresh_field("sync_time");
 		}
 
-		// --- Register button (for connections created without the wizard) ---
+		// --- Register / Re-register button ---
 		if (!frm.is_new() && !frm.doc.is_registered && frm.doc.setup_token) {
 			frm.add_custom_button(__("Register"), function () {
 				_do_register(frm);
+			}, __("Actions"));
+		}
+		if (!frm.is_new() && frm.doc.connection_status === "Revoked") {
+			frm.add_custom_button(__("Re-register"), function () {
+				_do_reregister(frm);
 			}, __("Actions"));
 		}
 
@@ -346,6 +351,48 @@ function _wizard_step2_save(d, state) {
 			});
 		},
 	});
+}
+
+// ---------------------------------------------------------------------------
+// Re-register (for revoked connections)
+// ---------------------------------------------------------------------------
+
+function _do_reregister(frm) {
+	frappe.prompt(
+		[
+			{
+				fieldname: "setup_token",
+				fieldtype: "Small Text",
+				label: __("New Setup Token"),
+				reqd: 1,
+				description: __(
+					'Paste a new token from <a href="https://beta-bridge.simplefin.org" target="_blank">SimpleFIN Bridge</a>.'
+				),
+			},
+		],
+		function (values) {
+			frappe.call({
+				method: CONN_METHOD + ".reregister",
+				args: {
+					connection: frm.doc.name,
+					setup_token: values.setup_token,
+				},
+				freeze: true,
+				freeze_message: __("Exchanging new token…"),
+				callback(r) {
+					if (!r.exc) {
+						frappe.show_alert({
+							message: __("Re-registration successful. Connection is active again."),
+							indicator: "green",
+						});
+						frm.reload_doc();
+					}
+				},
+			});
+		},
+		__("Re-register Connection"),
+		__("Register")
+	);
 }
 
 // ---------------------------------------------------------------------------
