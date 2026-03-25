@@ -33,9 +33,63 @@ frappe.ui.form.on("SimpleFIN Connection", {
 		// Account Mappings grid fixes
 		if (frm.fields_dict.account_mappings) {
 			// Prevent Insert/Duplicate buttons in both list and row edit views
-			frm.fields_dict.account_mappings.grid.cannot_add_rows = true;
-			frm.fields_dict.account_mappings.grid.grid_buttons.find(".grid-add-row").hide();
-			frm.fields_dict.account_mappings.grid.grid_buttons.find(".grid-add-multiple-rows").hide();
+			let grid = frm.fields_dict.account_mappings.grid;
+			grid.cannot_add_rows = true;
+			grid.grid_buttons.find(".grid-add-row").hide();
+			grid.grid_buttons.find(".grid-add-multiple-rows").hide();
+
+			// Add Cancel button to row edit form that reverts changes
+			if (!frm._grid_cancel_hooked) {
+				frm._grid_cancel_hooked = true;
+				let _editable_fields = [
+					"erpnext_bank_account", "is_active",
+					"extract_reference_number", "custom_reference_regex",
+					"extract_party_name", "custom_party_regex",
+				];
+
+				// Patch each grid row's show_form to snapshot and inject Cancel
+				function _patch_row(grid_row) {
+					if (grid_row._cancel_patched) return;
+					grid_row._cancel_patched = true;
+
+					let orig_show = grid_row.show_form.bind(grid_row);
+					grid_row.show_form = function () {
+						// Snapshot before editing
+						let snap = {};
+						_editable_fields.forEach(function (f) { snap[f] = grid_row.doc[f]; });
+						grid_row._snapshot = snap;
+
+						orig_show();
+
+						// Inject Cancel button
+						let $actions = grid_row.wrapper.find(".grid-form-heading .row-actions");
+						if (!$actions.find(".grid-cancel-row").length) {
+							$('<button class="btn btn-secondary btn-sm pull-right grid-cancel-row">'
+								+ __("Cancel") + "</button>")
+								.prependTo($actions)
+								.on("click", function (ev) {
+									ev.stopPropagation();
+									if (grid_row._snapshot) {
+										_editable_fields.forEach(function (f) {
+											grid_row.doc[f] = grid_row._snapshot[f];
+										});
+									}
+									grid_row.toggle_view(false);
+									grid.refresh();
+								});
+						}
+					};
+				}
+
+				// Patch existing rows
+				grid.grid_rows.forEach(_patch_row);
+				// Patch future rows via refresh override
+				let orig_refresh = grid.refresh.bind(grid);
+				grid.refresh = function () {
+					orig_refresh();
+					grid.grid_rows.forEach(_patch_row);
+				};
+			}
 			// Remove ellipsis class and force row heights for text wrapping
 			let $grid = frm.fields_dict.account_mappings.$wrapper;
 			$grid.find(".static-area.ellipsis").removeClass("ellipsis");
