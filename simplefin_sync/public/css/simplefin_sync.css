@@ -28,13 +28,3 @@
 .frappe-control[data-fieldname="account_mappings"] .data-row {
 	height: auto !important;
 }
-
-/* Normalize row edit form button heights */
-.frappe-control[data-fieldname="account_mappings"] .grid-form-heading .row-actions .btn,
-.frappe-control[data-fieldname="account_mappings"] .grid-form-heading .row-actions .btn-group .btn {
-	padding: 4px 10px !important;
-	font-size: var(--text-xs) !important;
-	line-height: 1.5 !important;
-	height: auto !important;
-	box-sizing: border-box !important;
-}
