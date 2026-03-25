@@ -1,33 +1,48 @@
-/* Allow text wrapping in Account Mapping grid cells */
-.frappe-control[data-fieldname="account_mappings"] .grid-overflow-no-ellipsis,
-.frappe-control[data-fieldname="account_mappings"] .grid-overflow-ellipsis {
-	overflow: visible !important;
-	text-overflow: unset !important;
-	white-space: normal !important;
-	word-break: break-word;
-}
+/* ----------------------------------------------------------------
+   Account Mapping grid — allow text wrapping in all cells.
+   Frappe's grid uses overflow:hidden and fixed heights that clip
+   wrapped text.  We override everything in the specificity chain.
+   ---------------------------------------------------------------- */
 
-.frappe-control[data-fieldname="account_mappings"] .rows .row .static-area {
-	white-space: normal !important;
-	word-break: break-word;
-	line-height: 1.4;
-	overflow: visible !important;
-}
-
-/* Ensure grid rows expand to fit wrapped content */
+/* The outermost grid-row container */
 .frappe-control[data-fieldname="account_mappings"] .grid-row {
 	height: auto !important;
-	min-height: auto !important;
+	max-height: none !important;
 }
 
-.frappe-control[data-fieldname="account_mappings"] .row-data,
-.frappe-control[data-fieldname="account_mappings"] .row-data > .row {
+/* The data-row flex container */
+.frappe-control[data-fieldname="account_mappings"] .data-row {
 	height: auto !important;
-	min-height: auto !important;
+	max-height: none !important;
+	align-items: stretch !important;
 }
 
+/* The row-data wrapper */
+.frappe-control[data-fieldname="account_mappings"] .row-data {
+	height: auto !important;
+	max-height: none !important;
+}
+
+/* Each column cell */
 .frappe-control[data-fieldname="account_mappings"] .grid-static-col {
 	overflow: visible !important;
+	height: auto !important;
+	max-height: none !important;
 	padding-top: 8px !important;
 	padding-bottom: 8px !important;
+}
+
+/* The text content inside cells */
+.frappe-control[data-fieldname="account_mappings"] .static-area,
+.frappe-control[data-fieldname="account_mappings"] .like-disabled-input,
+.frappe-control[data-fieldname="account_mappings"] .grid-overflow-ellipsis,
+.frappe-control[data-fieldname="account_mappings"] .grid-overflow-no-ellipsis {
+	white-space: normal !important;
+	overflow: visible !important;
+	text-overflow: unset !important;
+	word-break: break-word !important;
+	line-height: 1.4 !important;
+	height: auto !important;
+	max-height: none !important;
+	-webkit-line-clamp: unset !important;
 }
