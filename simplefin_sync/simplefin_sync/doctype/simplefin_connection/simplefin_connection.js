@@ -63,6 +63,14 @@ frappe.ui.form.on("SimpleFIN Connection", {
 
 						// Inject Cancel button
 						let $actions = grid_row.wrapper.find(".grid-form-heading .row-actions");
+
+						// Replace down-arrow collapse button with "Close" label
+						let $collapse = $actions.find(".grid-collapse-row");
+						if ($collapse.length && !$collapse.data("relabeled")) {
+							$collapse.data("relabeled", true);
+							$collapse.html(__("Close"));
+						}
+
 						if (!$actions.find(".grid-cancel-row").length) {
 							$('<button class="btn btn-secondary btn-sm pull-right grid-cancel-row">'
 								+ __("Cancel") + "</button>")
