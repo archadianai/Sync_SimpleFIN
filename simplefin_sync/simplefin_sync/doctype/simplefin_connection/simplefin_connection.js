@@ -6,9 +6,16 @@ const CONN_METHOD =
 	"simplefin_sync.simplefin_sync.doctype.simplefin_connection.simplefin_connection";
 
 frappe.ui.form.on("SimpleFIN Connection", {
-	after_save(frm) {
-		// After first save of a wizard-created, enabled, never-synced connection — offer Full Sync
+	refresh(frm) {
+		// --- Setup wizard on new connection ---
+		if (frm.is_new() && !frm._wizard_shown) {
+			frm._wizard_shown = true;
+			_show_setup_wizard(frm);
+		}
+
+		// --- Offer Full Sync on first load of enabled, never-synced connection ---
 		if (
+			!frm.is_new() &&
 			frm.doc.enabled &&
 			frm.doc.is_registered &&
 			frm.doc.last_sync_status === "Never Synced" &&
@@ -21,14 +28,6 @@ frappe.ui.form.on("SimpleFIN Connection", {
 					_do_sync_full(frm);
 				}
 			);
-		}
-	},
-
-	refresh(frm) {
-		// --- Setup wizard on new connection ---
-		if (frm.is_new() && !frm._wizard_shown) {
-			frm._wizard_shown = true;
-			_show_setup_wizard(frm);
 		}
 
 		// Show the system timezone on the Sync Time field description
