@@ -539,12 +539,22 @@ function _fix_grid_wrapping(frm) {
 
 	// Re-apply after grid re-renders (click in/out of cells)
 	if (!frm._grid_wrap_observer) {
+		let timer = null;
 		let observer = new MutationObserver(function () {
-			_fix_grid_wrapping(frm);
+			// Debounce to avoid recursive loop (our style changes trigger mutations)
+			if (timer) clearTimeout(timer);
+			timer = setTimeout(function () {
+				observer.disconnect();
+				_fix_grid_wrapping(frm);
+				let target = $grid.find(".grid-body")[0];
+				if (target) {
+					observer.observe(target, { childList: true, subtree: true, attributes: true });
+				}
+			}, 50);
 		});
 		let target = $grid.find(".grid-body")[0];
 		if (target) {
-			observer.observe(target, { childList: true, subtree: true });
+			observer.observe(target, { childList: true, subtree: true, attributes: true });
 			frm._grid_wrap_observer = observer;
 		}
 	}
