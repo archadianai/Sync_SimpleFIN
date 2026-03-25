@@ -28,11 +28,3 @@
 .frappe-control[data-fieldname="account_mappings"] .data-row {
 	height: auto !important;
 }
-
-/* Hide Insert Above/Below/Duplicate buttons in row edit form */
-.frappe-control[data-fieldname="account_mappings"] .grid-insert-row-below,
-.frappe-control[data-fieldname="account_mappings"] .grid-insert-row,
-.frappe-control[data-fieldname="account_mappings"] .grid-duplicate-row,
-.frappe-control[data-fieldname="account_mappings"] .grid-append-row {
-	display: none !important;
-}

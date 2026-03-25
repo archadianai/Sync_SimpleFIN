@@ -32,7 +32,10 @@ frappe.ui.form.on("SimpleFIN Connection", {
 
 		// Account Mappings grid fixes
 		if (frm.fields_dict.account_mappings) {
-			frm.fields_dict.account_mappings.grid.grid_buttons.find(".grid-duplicate-row").hide();
+			// Prevent Insert/Duplicate buttons in both list and row edit views
+			frm.fields_dict.account_mappings.grid.cannot_add_rows = true;
+			frm.fields_dict.account_mappings.grid.grid_buttons.find(".grid-add-row").hide();
+			frm.fields_dict.account_mappings.grid.grid_buttons.find(".grid-add-multiple-rows").hide();
 			// Remove ellipsis class and force row heights for text wrapping
 			let $grid = frm.fields_dict.account_mappings.$wrapper;
 			$grid.find(".static-area.ellipsis").removeClass("ellipsis");
