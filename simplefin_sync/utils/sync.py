@@ -490,6 +490,7 @@ def _get_active_mappings(conn) -> list:
 def _update_account_mappings(conn, accounts: list[dict]) -> None:
 	"""Auto-discover new SimpleFIN accounts and update existing mappings."""
 	existing_ids = {m.simplefin_account_id for m in (conn.account_mappings or [])}
+	original_ids = set(existing_ids)  # Snapshot before new accounts are added
 	now = now_datetime()
 	changed = False
 
@@ -523,16 +524,46 @@ def _update_account_mappings(conn, accounts: list[dict]) -> None:
 			existing_ids.add(acct_id)
 			changed = True
 
-	# Flag accounts that disappeared
+	# Flag accounts that disappeared and detect possible remappings
 	response_ids = {acct.get("id") for acct in accounts if acct.get("id")}
+	newly_missing = []
 	for m in (conn.account_mappings or []):
 		if m.simplefin_account_id not in response_ids and not m.missing_from_simplefin:
 			m.missing_from_simplefin = 1
 			changed = True
+			newly_missing.append(m)
 
 	if changed:
 		conn.save(ignore_permissions=True)
 		frappe.db.commit()
+
+	# Notify about disappeared accounts
+	for m in newly_missing:
+		notify_sync_failure(
+			conn,
+			_("Account '{0}' ({1}) is no longer reported by SimpleFIN Bridge. "
+			  "The mapping has been preserved but marked as missing.").format(
+				m.simplefin_account_name, m.simplefin_account_id
+			),
+		)
+
+		# Detect possible ID reassignment: a new account appeared in this
+		# response with matching name, org_domain, and currency.
+		new_ids = response_ids - original_ids
+		for acct in accounts:
+			if (
+				acct.get("id") in new_ids
+				and acct.get("name") == m.simplefin_account_name
+				and acct.get("org", {}).get("domain") == m.simplefin_org_domain
+				and acct.get("currency") == m.simplefin_currency
+			):
+				notify_sync_failure(
+					conn,
+					_("Account '{0}' may have been reassigned a new ID by SimpleFIN "
+					  "(old: {1}, new: {2}). Please verify your account mappings.").format(
+						m.simplefin_account_name, m.simplefin_account_id, acct.get("id")
+					),
+				)
 
 
 def _update_org_info(conn, account: dict) -> None:
