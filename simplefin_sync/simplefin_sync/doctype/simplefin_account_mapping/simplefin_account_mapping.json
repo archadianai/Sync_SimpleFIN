@@ -2,7 +2,7 @@
  "actions": [],
  "creation": "2026-03-23 00:00:00.000000",
  "doctype": "DocType",
- "editable_grid": 1,
+ "editable_grid": 0,
  "engine": "InnoDB",
  "field_order": [
   "simplefin_org_name",

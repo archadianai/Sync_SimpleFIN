@@ -30,11 +30,9 @@ frappe.ui.form.on("SimpleFIN Connection", {
 			);
 		}
 
-		// Disable duplicate row on Account Mappings grid + fix text wrapping
+		// Hide duplicate row button on Account Mappings grid
 		if (frm.fields_dict.account_mappings) {
-			frm.fields_dict.account_mappings.grid.cannot_add_rows = false;
 			frm.fields_dict.account_mappings.grid.grid_buttons.find(".grid-duplicate-row").hide();
-			_fix_grid_wrapping(frm);
 		}
 
 		// Show the system timezone on the Sync Time field description
@@ -496,68 +494,3 @@ function _has_mapped_accounts(frm) {
 	});
 }
 
-function _fix_grid_wrapping(frm) {
-	let $grid = frm.fields_dict.account_mappings.$wrapper;
-
-	// Force inline styles on every element in the constraint chain
-	$grid.find(".form-grid").css({
-		"overflow": "visible",
-	});
-	$grid.find(".data-row").css({
-		"height": "auto",
-	});
-	$grid.find(".grid-static-col").css({
-		"height": "auto",
-		"max-height": "none",
-		"overflow": "visible",
-		"padding-top": "8px",
-		"padding-bottom": "8px",
-	});
-	$grid.find(".static-area").each(function () {
-		$(this).removeClass("ellipsis").css({
-			"white-space": "normal",
-			"overflow": "visible",
-			"text-overflow": "unset",
-			"word-break": "break-word",
-			"max-width": "none",
-			"line-height": "1.4",
-		});
-	});
-
-	// Also fix editable-row inputs so they don't collapse height
-	$grid.find(".editable-row .grid-static-col").css({
-		"height": "auto",
-		"max-height": "none",
-		"overflow": "visible",
-	});
-	$grid.find(".editable-row .field-area").css({
-		"overflow": "visible",
-	});
-	$grid.find(".editable-row .form-group").css({
-		"margin-bottom": "0",
-	});
-
-	// Hook into grid row toggle to re-apply wrapping after edit mode exits
-	if (!frm._grid_wrap_hooked) {
-		frm._grid_wrap_hooked = true;
-
-		// Patch toggle_editable_row on each grid row to re-apply wrapping after
-		let grid = frm.fields_dict.account_mappings.grid;
-		let orig_refresh = grid.refresh.bind(grid);
-		grid.refresh = function () {
-			orig_refresh();
-			setTimeout(function () { _fix_grid_wrapping(frm); }, 10);
-		};
-
-		// Listen for clicks outside the grid to re-apply after Frappe
-		// finishes toggling the row back to static mode. Multiple delays
-		// to catch Frappe's async render cycle.
-		$(document).on("click.simplefin_grid", function (e) {
-			if (!$(e.target).closest('[data-fieldname="account_mappings"]').length) {
-				setTimeout(function () { _fix_grid_wrapping(frm); }, 100);
-				setTimeout(function () { _fix_grid_wrapping(frm); }, 300);
-				setTimeout(function () { _fix_grid_wrapping(frm); }, 500);
-			}
-		});
-	}
-}
