@@ -1428,14 +1428,27 @@ The following deviations and additions were discovered during v1.0 implementatio
 
 The spec did not address deleting a SimpleFIN Connection that has associated Sync Logs and Bank Transactions. Implementation adds `ignore_links_on_delete = ["SimpleFIN Sync Log", "Bank Transaction"]` to `hooks.py`, allowing connection deletion while retaining historical records. (Note: the hook value is the **linking** doctype, not the doctype being deleted.)
 
-### 16.5 Guided Registration Workflow
+### 16.5 Setup Wizard Dialog
 
-The spec describes the Register button appearing after save. The implementation enhances this with a chained UX flow:
+The spec describes the Register button appearing after save. The implementation replaces this with a guided multi-step dialog:
 
-1. **First save** of a new connection with a setup token → prompt: "Register now?"
-2. **Registration** auto-populates the Account Mappings table by fetching accounts via balances-only mode (one extra API call, minimal rate-limit impact)
-3. **Post-registration message** guides the user through: map accounts → check Active → check Enabled → Sync Now
-4. **"Enable & Sync Now" button** appears when the connection is registered and has mapped accounts but is not yet enabled — combines enable + sync in one click
+1. **New Connection** → wizard dialog pops up immediately (tracks doc name to re-trigger for each new connection)
+2. **Step 1:** Connection name + setup token → "Register" button
+3. **Step 2:** Token exchanged, accounts fetched and displayed grouped by institution. Each row has an ERPNext Bank Account Link dropdown → "Create Connection" button
+4. **On completion:** Connection form loads with a blue banner: "Review your settings below, then use Actions → Sync Full to import transactions."
+5. **Cancel** at any step dismisses the dialog and leaves the blank form for manual setup
+
+Server-side whitelisted methods:
+- `wizard_register()` — creates connection, exchanges token, fetches accounts, returns data for step 2
+- `wizard_save_mappings()` — applies bank account mappings and enables connection
+
+### 16.5.1 Re-register Flow
+
+When a connection's access token is revoked (HTTP 403):
+- `connection_status` is set to "Revoked"
+- **Actions → Re-register** button appears, prompting for a new setup token
+- Token is exchanged; connection restored to Active with all settings, mappings, and history preserved
+- The `setup_token` field is hidden on the form when registered and not revoked (via `depends_on`)
 
 ### 16.6 Enrichment Pattern Expansion
 
@@ -1484,16 +1497,57 @@ ERPNext's `enable_party_matching` (Accounts Settings > Others tab) runs in `befo
 - The `bank_party_name` field has `allow_on_submit=0` (read-only after submission) — this is by design; users correct matching via `party_type` and `party` fields which are editable
 - The Sync Time field description dynamically shows the system timezone from `frappe.boot.time_zone.system`
 
+### 16.10 Transaction Timezone Removed
+
+SimpleFIN Bridge normalises `posted` timestamps to noon UTC. At noon UTC, every timezone on earth resolves to the same calendar date. Verified with real BECU data: all transactions have `posted_at` at exactly 12:00:00 UTC. The `transaction_timezone` field was removed entirely — date conversion always uses UTC via `datetime.utcfromtimestamp()`.
+
+### 16.11 Enrichment Moved to Account Mapping
+
+The enrichment settings (`extract_reference_number`, `custom_reference_regex`, `extract_party_name`, `custom_party_regex`) were moved from the Connection to the Account Mapping child table. A single connection can aggregate accounts from multiple financial institutions with different description formats. Each account now has its own enrichment configuration, visible in the row edit form.
+
+Connection-level Organization Info (`org_name`, `org_domain`, `org_url`) was also removed — redundant with per-row `simplefin_org_name` and `simplefin_org_domain` on each Account Mapping.
+
+### 16.12 Sync Full / Sync Latest
+
+"Sync Now" was split into two actions:
+- **Sync Latest** — normal rolling window sync
+- **Sync Full** — resets `last_sync_end_date` to 0 and pulls full `initial_history_days` range. Used to recover deleted transactions or fill gaps.
+
+### 16.13 45-Day Chunk Limit
+
+SimpleFIN Bridge recommends 45-day max date ranges (not 90 as in the protocol spec). The default `max_days` in `build_chunks()` was changed to 45.
+
+### 16.14 Non-Editable Account Mapping Grid
+
+The Account Mapping child table uses `editable_grid: 0`. Clicking a row opens the full edit form. This avoids Frappe's persistent text wrapping issues with editable grids (the framework hardcodes an `ellipsis` class on cell re-render that cannot be reliably overridden via CSS).
+
+The row edit form has customized buttons:
+- **[Move] [Close]** on the left — Close replaces the default down-arrow icon
+- **[Cancel] [Delete]** on the right — Cancel reverts editable fields to their snapshot values
+- Insert Above/Below/Duplicate/Add Row are hidden via `cannot_add_rows`
+- Button heights normalized via inline `attr("style")` (CSS and jQuery `.css()` fail against Frappe's computed styles)
+
+### 16.15 Auto-Activate on Mapping
+
+When a user sets an ERPNext Bank Account on a mapping row, `is_active` is automatically set to 1 on the parent Connection's validate. This prevents the common error of mapping an account but forgetting to activate it.
+
+### 16.16 Disappeared Account Notifications
+
+When a mapped account stops appearing in SimpleFIN responses:
+- Flagged with `missing_from_simplefin = 1` (row preserved, never deleted)
+- `on_sync_failure` notification sent with account details
+- If a new account in the same response matches the missing account's `name`, `org_domain`, and `currency`, a remapping warning is sent
+
 ---
 
-## 16. Code Standards & Attribution
+## 17. Code Standards & Attribution
 
 ### Coding Standards
 - Follow existing ERPNext/Frappe codebase conventions
 - Python: PEP 8, type hints where practical, docstrings on all public methods
 - JavaScript: Frappe client-side patterns (frm.trigger, cur_frm, etc.)
 - Use `frappe._()` for all user-facing strings (translation support)
-- Use `frappe.get_logger()` for logging
+- Use `frappe.logger()` for logging (Frappe v16 — `get_logger()` was removed)
 - No raw SQL — use Frappe's ORM (`frappe.get_doc`, `frappe.get_all`, `frappe.db`)
 
 ### Attribution
