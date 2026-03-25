@@ -6,28 +6,13 @@ const CONN_METHOD =
 	"simplefin_sync.simplefin_sync.doctype.simplefin_connection.simplefin_connection";
 
 frappe.ui.form.on("SimpleFIN Connection", {
-	after_save(frm) {
-		// Only prompt on first save (creation) of an unregistered connection
-		// that has a setup token.
-		if (frm.is_new_doc_state && !frm.doc.is_registered && frm.doc.setup_token) {
-			frappe.confirm(
-				__("Setup token detected. Register with SimpleFIN Bridge now?"),
-				function () {
-					_do_register(frm);
-				}
-			);
-		}
-		frm.is_new_doc_state = false;
-	},
-
-	before_save(frm) {
-		// Track whether this is the initial creation save
-		if (frm.is_new()) {
-			frm.is_new_doc_state = true;
-		}
-	},
-
 	refresh(frm) {
+		// --- Setup wizard on new connection ---
+		if (frm.is_new() && !frm._wizard_shown) {
+			frm._wizard_shown = true;
+			_show_setup_wizard(frm);
+		}
+
 		// Show the system timezone on the Sync Time field description
 		let sys_tz = frappe.boot.time_zone?.system || frappe.sys_defaults?.time_zone || "";
 		if (sys_tz && frm.fields_dict.sync_time) {
@@ -35,8 +20,8 @@ frappe.ui.form.on("SimpleFIN Connection", {
 			frm.refresh_field("sync_time");
 		}
 
-		// --- Register button ---
-		if (!frm.doc.is_registered && frm.doc.setup_token) {
+		// --- Register button (for connections created without the wizard) ---
+		if (!frm.is_new() && !frm.doc.is_registered && frm.doc.setup_token) {
 			frm.add_custom_button(__("Register"), function () {
 				_do_register(frm);
 			}, __("Actions"));
@@ -69,9 +54,8 @@ frappe.ui.form.on("SimpleFIN Connection", {
 			}, __("Actions"));
 		}
 
-		// --- Enable & Sync prompt for registered but not-yet-enabled connections
-		//     that have at least one mapped account ---
-		if (frm.doc.is_registered && !frm.doc.enabled && _has_mapped_accounts(frm)) {
+		// --- Enable & Sync for registered + mapped but not enabled ---
+		if (!frm.is_new() && frm.doc.is_registered && !frm.doc.enabled && _has_mapped_accounts(frm)) {
 			frm.add_custom_button(__("Enable & Sync"), function () {
 				frm.set_value("enabled", 1);
 				frm.save().then(function () {
@@ -108,20 +92,242 @@ frappe.ui.form.on("SimpleFIN Connection", {
 		}
 
 		// --- Dashboard indicators ---
-		if (frm.doc.is_registered) {
-			frm.dashboard.set_headline_alert(
-				'<span class="indicator whitespace-nowrap green">' + __("Registered") + "</span>"
-			);
-		} else {
-			frm.dashboard.set_headline_alert(
-				'<span class="indicator whitespace-nowrap red">' + __("Unregistered") + "</span>"
-			);
+		if (!frm.is_new()) {
+			if (frm.doc.is_registered) {
+				frm.dashboard.set_headline_alert(
+					'<span class="indicator whitespace-nowrap green">' + __("Registered") + "</span>"
+				);
+			} else {
+				frm.dashboard.set_headline_alert(
+					'<span class="indicator whitespace-nowrap red">' + __("Unregistered") + "</span>"
+				);
+			}
 		}
 	},
 });
 
 // ---------------------------------------------------------------------------
-// Chained workflow helpers
+// Setup Wizard Dialog
+// ---------------------------------------------------------------------------
+
+function _show_setup_wizard(frm) {
+	let wizard_state = { step: 1, connection: null, accounts: [] };
+
+	let d = new frappe.ui.Dialog({
+		title: __("New SimpleFIN Connection"),
+		size: "large",
+		fields: [
+			// Step 1 fields
+			{
+				fieldname: "step_html",
+				fieldtype: "HTML",
+				options: '<div class="text-muted small">' + __("Step 1 of 2: Connect to SimpleFIN Bridge") + "</div><hr>",
+			},
+			{
+				fieldname: "connection_name",
+				fieldtype: "Data",
+				label: __("Connection Name"),
+				reqd: 1,
+				description: __("A friendly label (e.g., 'BECU Business', 'Chase Personal')"),
+			},
+			{
+				fieldname: "setup_token",
+				fieldtype: "Small Text",
+				label: __("Setup Token"),
+				reqd: 1,
+				description: __(
+					'Paste the token from <a href="https://beta-bridge.simplefin.org" target="_blank">SimpleFIN Bridge</a>. ' +
+					"This is a one-time code that will be exchanged for a secure connection."
+				),
+			},
+		],
+		primary_action_label: __("Register"),
+		primary_action(values) {
+			if (wizard_state.step === 1) {
+				_wizard_step1_register(d, wizard_state, values);
+			} else {
+				_wizard_step2_save(d, wizard_state, frm);
+			}
+		},
+		secondary_action_label: __("Cancel"),
+		secondary_action() {
+			d.hide();
+		},
+	});
+
+	d.show();
+}
+
+function _wizard_step1_register(d, state, values) {
+	frappe.call({
+		method: CONN_METHOD + ".wizard_register",
+		args: {
+			connection_name: values.connection_name,
+			setup_token: values.setup_token,
+		},
+		btn: d.get_primary_btn(),
+		freeze: true,
+		freeze_message: __("Exchanging token and fetching accounts…"),
+		callback(r) {
+			if (r.exc) return;
+
+			let data = r.message;
+			state.step = 2;
+			state.connection = data.connection;
+			state.accounts = data.accounts;
+
+			// Rebuild dialog for step 2
+			d.set_title(__("Map Your Accounts"));
+			d.fields_dict.step_html.$wrapper.html(
+				'<div class="text-muted small">' +
+				__("Step 2 of 2: Map SimpleFIN accounts to ERPNext") +
+				"</div><hr>"
+			);
+
+			// Hide step 1 fields
+			d.set_df_property("connection_name", "hidden", 1);
+			d.set_df_property("setup_token", "hidden", 1);
+
+			// Build account mapping HTML
+			let html = _build_account_mapping_html(data);
+			if (!d.fields_dict.accounts_section) {
+				d.fields.push(
+					{ fieldname: "accounts_section", fieldtype: "HTML", options: html }
+				);
+				d.make();
+				d.show();
+			} else {
+				d.fields_dict.accounts_section.$wrapper.html(html);
+			}
+
+			// Attach Link field controls to the bank account cells
+			_attach_bank_account_links(d, data.accounts);
+
+			d.set_primary_action(__("Create Connection"), function () {
+				_wizard_step2_save(d, state);
+			});
+		},
+	});
+}
+
+function _build_account_mapping_html(data) {
+	let html = "";
+
+	if (data.org_name) {
+		html += `<div class="mb-3"><b>${frappe.utils.escape_html(data.org_name)}</b>`;
+		if (data.org_domain) {
+			html += ` <span class="text-muted">(${frappe.utils.escape_html(data.org_domain)})</span>`;
+		}
+		html += "</div>";
+	}
+
+	// Group accounts by org_name
+	let groups = {};
+	for (let acct of data.accounts) {
+		let key = acct.org_name || "Other";
+		if (!groups[key]) groups[key] = [];
+		groups[key].push(acct);
+	}
+
+	for (let [org, accounts] of Object.entries(groups)) {
+		if (Object.keys(groups).length > 1) {
+			html += `<div class="mt-3 mb-2"><b>${frappe.utils.escape_html(org)}</b></div>`;
+		}
+
+		html += '<table class="table table-bordered table-sm"><thead><tr>' +
+			`<th>${__("Account")}</th>` +
+			`<th>${__("Currency")}</th>` +
+			`<th>${__("Balance")}</th>` +
+			`<th>${__("ERPNext Bank Account")}</th>` +
+			"</tr></thead><tbody>";
+
+		for (let acct of accounts) {
+			let esc_id = frappe.utils.escape_html(acct.id);
+			html += "<tr>" +
+				`<td>${frappe.utils.escape_html(acct.name)}</td>` +
+				`<td>${frappe.utils.escape_html(acct.currency)}</td>` +
+				`<td class="text-right">${frappe.utils.escape_html(acct.balance)}</td>` +
+				`<td><div class="wizard-bank-link" data-account-id="${esc_id}"></div></td>` +
+				"</tr>";
+		}
+
+		html += "</tbody></table>";
+	}
+
+	html += '<p class="text-muted small">' +
+		__("Select an ERPNext Bank Account for each account you want to sync. Leave blank to skip.") +
+		"</p>";
+
+	return html;
+}
+
+function _attach_bank_account_links(d, accounts) {
+	// After a short delay for DOM rendering, attach Frappe Link controls
+	setTimeout(function () {
+		d.$wrapper.find(".wizard-bank-link").each(function () {
+			let $cell = $(this);
+			let acct_id = $cell.data("account-id");
+
+			let control = frappe.ui.form.make_control({
+				df: {
+					fieldname: "bank_account_" + acct_id,
+					fieldtype: "Link",
+					options: "Bank Account",
+					placeholder: __("Select Bank Account"),
+				},
+				parent: $cell,
+				render_input: true,
+			});
+			control.$input.css("min-width", "200px");
+			$cell.data("control", control);
+		});
+	}, 100);
+}
+
+function _wizard_step2_save(d, state) {
+	// Collect mappings from the Link controls
+	let mappings = [];
+	d.$wrapper.find(".wizard-bank-link").each(function () {
+		let $cell = $(this);
+		let acct_id = $cell.data("account-id");
+		let control = $cell.data("control");
+		let bank_acct = control ? control.get_value() : "";
+		if (bank_acct) {
+			mappings.push({
+				simplefin_account_id: acct_id,
+				erpnext_bank_account: bank_acct,
+			});
+		}
+	});
+
+	if (!mappings.length) {
+		frappe.msgprint(__("Please map at least one account to an ERPNext Bank Account."));
+		return;
+	}
+
+	frappe.call({
+		method: CONN_METHOD + ".wizard_save_mappings",
+		args: {
+			connection: state.connection,
+			mappings: JSON.stringify(mappings),
+		},
+		btn: d.get_primary_btn(),
+		freeze: true,
+		freeze_message: __("Saving connection…"),
+		callback(r) {
+			if (r.exc) return;
+			d.hide();
+			frappe.set_route("Form", "SimpleFIN Connection", state.connection);
+			frappe.show_alert({
+				message: __("Connection created and enabled! Use Actions → Sync Latest to pull transactions."),
+				indicator: "green",
+			});
+		},
+	});
+}
+
+// ---------------------------------------------------------------------------
+// Action button helpers (for existing connections)
 // ---------------------------------------------------------------------------
 
 function _do_register(frm) {
@@ -140,32 +346,11 @@ function _do_register(frm) {
 			if (r.exc) return;
 			frappe.show_alert({ message: __("Registration successful"), indicator: "green" });
 			frm.reload_doc();
-			// Accounts are already populated — guide user to mapping
-			frappe.msgprint({
-				title: __("Registration Complete"),
-				message: __(
-					"Your SimpleFIN accounts have been discovered and added to the " +
-					"Account Mappings table below.<br><br>" +
-					"<b>Next steps:</b><br>" +
-					"1. Set the <b>ERPNext Bank Account</b> for each account you want to sync<br>" +
-					"2. Check the <b>Active</b> checkbox for those accounts<br>" +
-					"3. Check the <b>Enabled</b> checkbox at the top of this form<br>" +
-					"4. Save, then click <b>Actions → Sync Now</b>"
-				),
-				indicator: "green",
-				primary_action: {
-					label: __("Go to Account Mappings"),
-					action() {
-						frappe.msg_dialog.hide();
-						frm.scroll_to_field("account_mappings");
-					},
-				},
-			});
 		},
 	});
 }
 
-function _do_test(frm, offer_sync) {
+function _do_test(frm) {
 	if (frm.doc.rate_limit_paused_until) {
 		frappe.msgprint(
 			__("Connection is rate-limited until {0}. Test blocked.", [
@@ -187,22 +372,6 @@ function _do_test(frm, offer_sync) {
 					message: r.message,
 					indicator: "green",
 				});
-			}
-			if (offer_sync) {
-				// Wait a moment for the msgprint to render, then offer sync
-				setTimeout(function () {
-					frappe.confirm(
-						__(
-							"Connection test successful! " +
-							"To sync transactions, map your accounts in the Account Mappings " +
-							"table, enable the connection, and click Sync Now."
-						),
-						function () {
-							frm.reload_doc();
-							frm.scroll_to_field("account_mappings");
-						}
-					);
-				}, 500);
 			}
 		},
 	});
@@ -255,7 +424,6 @@ function _do_sync_full(frm) {
 }
 
 function _has_mapped_accounts(frm) {
-	// Returns true if at least one account mapping has an ERPNext Bank Account set
 	return (frm.doc.account_mappings || []).some(function (m) {
 		return m.erpnext_bank_account;
 	});

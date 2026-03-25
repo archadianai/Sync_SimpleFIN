@@ -348,6 +348,131 @@ def clear_rate_limit_pause(connection: str) -> None:
 	frappe.db.commit()
 
 
+@frappe.whitelist()
+def wizard_register(connection_name: str, setup_token: str) -> dict:
+	"""Setup wizard: create connection, exchange token, return discovered accounts.
+
+	Creates a SimpleFIN Connection, performs the one-time token exchange,
+	fetches the account list, and returns the data for the wizard dialog
+	to display account mapping fields.
+
+	Returns:
+		dict with ``connection`` (name), ``org`` info, and ``accounts`` list.
+	"""
+	from simplefin_sync.utils.simplefin_client import (
+		SimpleFINAuthError,
+		SimpleFINClient,
+		SimpleFINError,
+	)
+
+	# Create the connection
+	conn = frappe.get_doc({
+		"doctype": "SimpleFIN Connection",
+		"connection_name": connection_name,
+		"setup_token": setup_token,
+		"sync_frequency": frappe.db.get_single_value(
+			"SimpleFIN Sync Settings", "default_sync_frequency"
+		) or "Daily",
+		"on_sync_failure": "System Notification",
+		"on_empty_account": "Log Only",
+		"on_record_mismatch": "System Notification",
+	})
+	conn.insert(ignore_permissions=True)
+	frappe.db.commit()
+
+	# Exchange the token
+	token_value = conn.get_password("setup_token")
+	if not token_value:
+		frappe.throw(_("Setup token is empty."))
+
+	try:
+		access_url = SimpleFINClient.claim_access_url(token_value)
+	except SimpleFINAuthError:
+		# Clean up the connection on failure
+		frappe.delete_doc("SimpleFIN Connection", conn.name, force=True)
+		frappe.db.commit()
+		frappe.throw(
+			_(
+				"This setup token has already been used or is compromised. "
+				"Please generate a new token from SimpleFIN Bridge."
+			)
+		)
+	except SimpleFINError as e:
+		frappe.delete_doc("SimpleFIN Connection", conn.name, force=True)
+		frappe.db.commit()
+		frappe.throw(_("Registration failed: {0}").format(str(e)))
+
+	# Store credentials
+	conn.access_url = access_url
+	conn.is_registered = 1
+	conn.setup_token = ""
+	conn.registration_date = now_datetime()
+	conn.connection_status = "Active"
+	conn.save(ignore_permissions=True)
+	frappe.db.commit()
+
+	# Fetch accounts
+	client = SimpleFINClient(access_url)
+	try:
+		data = client.test_connection()
+	except SimpleFINError:
+		data = {"accounts": []}
+
+	# Populate account mappings on the connection
+	_populate_account_mappings(conn, client)
+
+	# Build response for the wizard dialog
+	accounts = []
+	for acct in data.get("accounts", []):
+		org = acct.get("org", {})
+		accounts.append({
+			"id": acct.get("id", ""),
+			"name": acct.get("name", ""),
+			"currency": acct.get("currency", ""),
+			"balance": acct.get("balance", "0"),
+			"org_name": org.get("name", ""),
+			"org_domain": org.get("domain", ""),
+		})
+
+	return {
+		"connection": conn.name,
+		"org_name": conn.org_name or "",
+		"org_domain": conn.org_domain or "",
+		"accounts": accounts,
+	}
+
+
+@frappe.whitelist()
+def wizard_save_mappings(connection: str, mappings: str) -> None:
+	"""Setup wizard: save account-to-bank-account mappings and enable.
+
+	Args:
+		connection: SimpleFIN Connection name.
+		mappings: JSON string — list of dicts with ``simplefin_account_id``
+			and ``erpnext_bank_account``.
+	"""
+	import json as _json
+
+	conn = frappe.get_doc("SimpleFIN Connection", connection)
+	mapping_list = _json.loads(mappings) if isinstance(mappings, str) else mappings
+
+	# Update each mapping row
+	for entry in mapping_list:
+		acct_id = entry.get("simplefin_account_id")
+		bank_acct = entry.get("erpnext_bank_account")
+		if not acct_id:
+			continue
+		for m in conn.account_mappings:
+			if m.simplefin_account_id == acct_id and bank_acct:
+				m.erpnext_bank_account = bank_acct
+				m.is_active = 1
+				break
+
+	conn.enabled = 1
+	conn.save(ignore_permissions=True)
+	frappe.db.commit()
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
