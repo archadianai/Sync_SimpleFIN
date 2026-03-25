@@ -6,6 +6,24 @@ const CONN_METHOD =
 	"simplefin_sync.simplefin_sync.doctype.simplefin_connection.simplefin_connection";
 
 frappe.ui.form.on("SimpleFIN Connection", {
+	after_save(frm) {
+		// After first save of a wizard-created, enabled, never-synced connection — offer Full Sync
+		if (
+			frm.doc.enabled &&
+			frm.doc.is_registered &&
+			frm.doc.last_sync_status === "Never Synced" &&
+			!frm._sync_offered
+		) {
+			frm._sync_offered = true;
+			frappe.confirm(
+				__("Connection is ready. Run a full sync now to import transactions?"),
+				function () {
+					_do_sync_full(frm);
+				}
+			);
+		}
+	},
+
 	refresh(frm) {
 		// --- Setup wizard on new connection ---
 		if (frm.is_new() && !frm._wizard_shown) {
@@ -117,12 +135,14 @@ function _show_setup_wizard(frm) {
 		title: __("New SimpleFIN Connection"),
 		size: "large",
 		fields: [
-			// Step 1 fields
+			// Step indicator (updated per step)
 			{
 				fieldname: "step_html",
 				fieldtype: "HTML",
-				options: '<div class="text-muted small">' + __("Step 1 of 2: Connect to SimpleFIN Bridge") + "</div><hr>",
+				options: '<div class="text-muted small">' +
+					__("Step 1 of 2: Connect to SimpleFIN Bridge") + "</div><hr>",
 			},
+			// Step 1 fields
 			{
 				fieldname: "connection_name",
 				fieldtype: "Data",
@@ -140,13 +160,19 @@ function _show_setup_wizard(frm) {
 					"This is a one-time code that will be exchanged for a secure connection."
 				),
 			},
+			// Step 2 field (hidden initially)
+			{
+				fieldname: "accounts_html",
+				fieldtype: "HTML",
+				hidden: 1,
+			},
 		],
 		primary_action_label: __("Register"),
 		primary_action(values) {
 			if (wizard_state.step === 1) {
 				_wizard_step1_register(d, wizard_state, values);
 			} else {
-				_wizard_step2_save(d, wizard_state, frm);
+				_wizard_step2_save(d, wizard_state);
 			}
 		},
 		secondary_action_label: __("Cancel"),
@@ -176,7 +202,7 @@ function _wizard_step1_register(d, state, values) {
 			state.connection = data.connection;
 			state.accounts = data.accounts;
 
-			// Rebuild dialog for step 2
+			// Update step indicator
 			d.set_title(__("Map Your Accounts"));
 			d.fields_dict.step_html.$wrapper.html(
 				'<div class="text-muted small">' +
@@ -186,22 +212,19 @@ function _wizard_step1_register(d, state, values) {
 
 			// Hide step 1 fields
 			d.set_df_property("connection_name", "hidden", 1);
+			d.set_df_property("connection_name", "reqd", 0);
 			d.set_df_property("setup_token", "hidden", 1);
+			d.set_df_property("setup_token", "reqd", 0);
 
-			// Build account mapping HTML
+			// Show step 2 with account mapping table
+			d.set_df_property("accounts_html", "hidden", 0);
 			let html = _build_account_mapping_html(data);
-			if (!d.fields_dict.accounts_section) {
-				d.fields.push(
-					{ fieldname: "accounts_section", fieldtype: "HTML", options: html }
-				);
-				d.make();
-				d.show();
-			} else {
-				d.fields_dict.accounts_section.$wrapper.html(html);
-			}
+			d.fields_dict.accounts_html.$wrapper.html(html);
 
-			// Attach Link field controls to the bank account cells
-			_attach_bank_account_links(d, data.accounts);
+			// Attach Link controls after DOM renders
+			setTimeout(function () {
+				_attach_bank_account_links(d, data.accounts);
+			}, 200);
 
 			d.set_primary_action(__("Create Connection"), function () {
 				_wizard_step2_save(d, state);
@@ -262,26 +285,25 @@ function _build_account_mapping_html(data) {
 }
 
 function _attach_bank_account_links(d, accounts) {
-	// After a short delay for DOM rendering, attach Frappe Link controls
-	setTimeout(function () {
-		d.$wrapper.find(".wizard-bank-link").each(function () {
-			let $cell = $(this);
-			let acct_id = $cell.data("account-id");
+	d.$wrapper.find(".wizard-bank-link").each(function () {
+		let $cell = $(this);
+		let acct_id = $cell.data("account-id");
 
-			let control = frappe.ui.form.make_control({
-				df: {
-					fieldname: "bank_account_" + acct_id,
-					fieldtype: "Link",
-					options: "Bank Account",
-					placeholder: __("Select Bank Account"),
-				},
-				parent: $cell,
-				render_input: true,
-			});
-			control.$input.css("min-width", "200px");
-			$cell.data("control", control);
+		// Use Frappe's ControlLink class directly
+		let control = new frappe.ui.form.ControlLink({
+			df: {
+				fieldname: "bank_account_" + acct_id,
+				fieldtype: "Link",
+				options: "Bank Account",
+				placeholder: __("Select Bank Account"),
+			},
+			parent: $cell,
+			only_input: true,
 		});
-	}, 100);
+		control.make_input();
+		control.$input.css("min-width", "200px");
+		$cell.data("control", control);
+	});
 }
 
 function _wizard_step2_save(d, state) {
