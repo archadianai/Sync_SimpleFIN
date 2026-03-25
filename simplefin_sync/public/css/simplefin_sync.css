@@ -1,0 +1,6 @@
+/* Allow text wrapping in Account Mapping grid cells */
+.frappe-control[data-fieldname="account_mappings"] .rows .row .static-area,
+.frappe-control[data-fieldname="account_mappings"] .rows .row .field-area .like-disabled-input {
+	white-space: normal !important;
+	word-break: break-word;
+}

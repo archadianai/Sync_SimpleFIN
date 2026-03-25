@@ -11,6 +11,8 @@ app_version = "1.0.0"
 app_license = "GPL-3.0"
 required_apps = ["frappe", "erpnext"]
 
+app_include_css = "/assets/simplefin_sync/css/simplefin_sync.css"
+
 # Custom fields injected into Bank Transaction
 after_install = "simplefin_sync.install.after_install"
 after_uninstall = "simplefin_sync.install.after_uninstall"
