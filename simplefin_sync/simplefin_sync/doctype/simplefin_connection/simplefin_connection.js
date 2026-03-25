@@ -13,20 +13,18 @@ frappe.ui.form.on("SimpleFIN Connection", {
 			_show_setup_wizard(frm);
 		}
 
-		// --- Offer Full Sync on first load of enabled, never-synced connection ---
+		// --- Guide user on never-synced connections ---
 		if (
 			!frm.is_new() &&
-			frm.doc.enabled &&
 			frm.doc.is_registered &&
 			frm.doc.last_sync_status === "Never Synced" &&
-			!frm._sync_offered
+			!frm._guide_shown
 		) {
-			frm._sync_offered = true;
-			frappe.confirm(
-				__("Connection is ready. Run a full sync now to import transactions?"),
-				function () {
-					_do_sync_full(frm);
-				}
+			frm._guide_shown = true;
+			frm.dashboard.set_headline_alert(
+				'<span class="indicator whitespace-nowrap blue">' +
+				__("Review your settings below, then use Actions → Sync Full to import transactions.") +
+				"</span>"
 			);
 		}
 
