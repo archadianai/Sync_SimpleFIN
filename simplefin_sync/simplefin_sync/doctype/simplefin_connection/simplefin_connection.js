@@ -61,20 +61,24 @@ frappe.ui.form.on("SimpleFIN Connection", {
 
 						orig_show();
 
-						// Inject Cancel button
+						// Rearrange row edit form buttons:
+						// [Move] [Close]  ...gap...  [Cancel] [Delete]
 						let $actions = grid_row.wrapper.find(".grid-form-heading .row-actions");
+						if (!$actions.data("rearranged")) {
+							$actions.data("rearranged", true);
 
-						// Replace down-arrow collapse button with "Close" label
-						let $collapse = $actions.find(".grid-collapse-row");
-						if ($collapse.length && !$collapse.data("relabeled")) {
-							$collapse.data("relabeled", true);
+							// Replace down-arrow with "Close" label
+							let $collapse = $actions.find(".grid-collapse-row");
 							$collapse.html(__("Close"));
-						}
 
-						if (!$actions.find(".grid-cancel-row").length) {
-							$('<button class="btn btn-secondary btn-sm pull-right grid-cancel-row">'
+							// Build two button groups
+							let $move = $actions.find(".grid-move-row").detach();
+							let $delete = $actions.find(".grid-delete-row").detach();
+							$collapse.detach();
+
+							// Create Cancel button
+							let $cancel = $('<button class="btn btn-secondary btn-sm grid-cancel-row">'
 								+ __("Cancel") + "</button>")
-								.prependTo($actions)
 								.on("click", function (ev) {
 									ev.stopPropagation();
 									if (grid_row._snapshot) {
@@ -85,6 +89,14 @@ frappe.ui.form.on("SimpleFIN Connection", {
 									grid_row.toggle_view(false);
 									grid.refresh();
 								});
+
+							// Clear and rebuild with grouped layout
+							$actions.empty().css("display", "flex").css("align-items", "center").css("gap", "4px");
+							let $left = $('<span class="btn-group btn-group-sm"></span>').appendTo($actions);
+							$left.append($move).append($collapse);
+							$('<span style="flex-grow:1"></span>').appendTo($actions);
+							let $right = $('<span class="btn-group btn-group-sm"></span>').appendTo($actions);
+							$right.append($cancel).append($delete);
 						}
 					};
 				}
