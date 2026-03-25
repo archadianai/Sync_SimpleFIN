@@ -70,17 +70,30 @@ frappe.ui.form.on("SimpleFIN Connection", {
 			}, __("Actions"));
 		}
 
-		// --- Sync Now button ---
+		// --- Sync buttons ---
 		if (frm.doc.enabled) {
-			frm.add_custom_button(__("Sync Now"), function () {
+			frm.add_custom_button(__("Sync Latest"), function () {
 				_do_sync_now(frm);
+			}, __("Actions"));
+
+			frm.add_custom_button(__("Sync Full"), function () {
+				frappe.confirm(
+					__(
+						"This will re-pull the full transaction history ({0} days). " +
+						"Use this to recover deleted transactions or fill gaps. Continue?",
+						[frm.doc.initial_history_days || 90]
+					),
+					function () {
+						_do_sync_full(frm);
+					}
+				);
 			}, __("Actions"));
 		}
 
 		// --- Enable & Sync prompt for registered but not-yet-enabled connections
 		//     that have at least one mapped account ---
 		if (frm.doc.is_registered && !frm.doc.enabled && _has_mapped_accounts(frm)) {
-			frm.add_custom_button(__("Enable & Sync Now"), function () {
+			frm.add_custom_button(__("Enable & Sync"), function () {
 				frm.set_value("enabled", 1);
 				frm.save().then(function () {
 					_do_sync_now(frm);
@@ -233,6 +246,29 @@ function _do_sync_now(frm) {
 		callback(r) {
 			if (!r.exc) {
 				frappe.show_alert({ message: __("Sync job queued"), indicator: "blue" });
+				frm.reload_doc();
+			}
+		},
+	});
+}
+
+function _do_sync_full(frm) {
+	if (frm.doc.rate_limit_paused_until) {
+		frappe.msgprint(
+			__("Connection is rate-limited until {0}. Sync blocked.", [
+				frm.doc.rate_limit_paused_until,
+			])
+		);
+		return;
+	}
+	frappe.call({
+		method: CONN_METHOD + ".sync_full",
+		args: { connection: frm.doc.name },
+		freeze: true,
+		freeze_message: __("Queuing full sync job…"),
+		callback(r) {
+			if (!r.exc) {
+				frappe.show_alert({ message: __("Full sync job queued"), indicator: "blue" });
 				frm.reload_doc();
 			}
 		},

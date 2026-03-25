@@ -317,6 +317,36 @@ def sync_now(connection: str) -> None:
 
 
 @frappe.whitelist()
+def sync_full(connection: str) -> None:
+	"""Reset last_sync_end_date and queue a full history sync."""
+	conn = frappe.get_doc("SimpleFIN Connection", connection)
+
+	if not conn.enabled:
+		frappe.throw(_("Connection is not enabled."))
+
+	if conn.rate_limit_paused_until and now_datetime() < conn.rate_limit_paused_until:
+		frappe.throw(
+			_("Connection is rate-limited until {0}. Sync blocked.").format(
+				conn.rate_limit_paused_until
+			)
+		)
+
+	conn.last_sync_end_date = 0
+	conn.sync_state = "Queued"
+	conn.save(ignore_permissions=True)
+
+	frappe.enqueue(
+		"simplefin_sync.utils.sync.run_sync",
+		connection=conn.name,
+		queue="long",
+		deduplicate=True,
+		job_id=f"simplefin_sync_{conn.name}",
+		timeout=600,
+	)
+	frappe.db.commit()
+
+
+@frappe.whitelist()
 def clear_rate_limit_pause(connection: str) -> None:
 	"""Clear the rate limit pause (System Manager only)."""
 	if "System Manager" not in frappe.get_roles():
