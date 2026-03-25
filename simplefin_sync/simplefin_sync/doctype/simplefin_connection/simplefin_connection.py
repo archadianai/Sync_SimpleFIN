@@ -39,7 +39,14 @@ class SimpleFINConnection(Document):
 		self._validate_retry_window()
 		self._validate_custom_regex("custom_reference_regex", _("Custom Reference Regex"))
 		self._validate_custom_regex("custom_party_regex", _("Custom Party Regex"))
+		self._auto_activate_mapped_accounts()
 		self._compute_next_scheduled_sync()
+
+	def _auto_activate_mapped_accounts(self) -> None:
+		"""Auto-set is_active=1 when an ERPNext Bank Account is assigned."""
+		for m in (self.account_mappings or []):
+			if m.erpnext_bank_account and not m.is_active:
+				m.is_active = 1
 
 	def _validate_enabled_requires_registration(self) -> None:
 		if self.enabled and not self.is_registered:

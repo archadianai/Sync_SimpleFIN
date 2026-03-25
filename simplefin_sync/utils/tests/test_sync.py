@@ -25,25 +25,25 @@ from simplefin_sync.utils.sync import (
 class TestBuildChunks(FrappeTestCase):
 	"""Tests for build_chunks()."""
 
-	def test_single_chunk_under_90_days(self):
-		"""Range < 90 days produces one chunk."""
+	def test_single_chunk_under_45_days(self):
+		"""Range < 45 days produces one chunk."""
 		end = int(time.time())
 		start = end - (30 * 86400)  # 30 days
 		chunks = build_chunks(start, end)
 		self.assertEqual(len(chunks), 1)
 		self.assertEqual(chunks[0], (start, end))
 
-	def test_exactly_90_days(self):
-		"""Range = 90 days produces one chunk."""
+	def test_exactly_45_days(self):
+		"""Range = 45 days produces one chunk."""
 		end = int(time.time())
-		start = end - (90 * 86400)
+		start = end - (45 * 86400)
 		chunks = build_chunks(start, end)
 		self.assertEqual(len(chunks), 1)
 
-	def test_180_days_produces_two_chunks(self):
-		"""180-day range splits into 2 chunks, newest first."""
+	def test_90_days_produces_two_chunks(self):
+		"""90-day range splits into 2 chunks, newest first."""
 		end = int(time.time())
-		start = end - (180 * 86400)
+		start = end - (90 * 86400)
 		chunks = build_chunks(start, end)
 		self.assertEqual(len(chunks), 2)
 		# First chunk should be the newest
@@ -51,17 +51,17 @@ class TestBuildChunks(FrappeTestCase):
 		# Second chunk should start at the original start
 		self.assertEqual(chunks[1][0], start)
 
-	def test_365_days_produces_five_chunks(self):
-		"""365-day range produces 5 chunks (4×90 + 5 days)."""
+	def test_365_days_produces_nine_chunks(self):
+		"""365-day range produces 9 chunks (8×45 + 5 days)."""
 		end = int(time.time())
 		start = end - (365 * 86400)
 		chunks = build_chunks(start, end)
-		self.assertEqual(len(chunks), 5)
+		self.assertEqual(len(chunks), 9)
 
 	def test_newest_first_ordering(self):
 		"""Chunks are ordered newest to oldest."""
 		end = int(time.time())
-		start = end - (270 * 86400)  # 3 chunks
+		start = end - (135 * 86400)  # 3 chunks at 45 days each
 		chunks = build_chunks(start, end)
 		self.assertEqual(len(chunks), 3)
 		# Each chunk's end should be >= the next chunk's end

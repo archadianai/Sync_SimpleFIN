@@ -324,7 +324,7 @@ def _calculate_date_range(conn) -> tuple[int, int]:
 def build_chunks(
 	start_ts: int,
 	end_ts: int,
-	max_days: int = 90,
+	max_days: int = 45,
 ) -> list[tuple[int, int]]:
 	"""Split a date range into ≤90-day chunks, newest first.
 
