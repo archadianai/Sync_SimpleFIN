@@ -537,25 +537,23 @@ function _fix_grid_wrapping(frm) {
 		"margin-bottom": "0",
 	});
 
-	// Re-apply after grid re-renders (click in/out of cells)
-	if (!frm._grid_wrap_observer) {
-		let timer = null;
-		let observer = new MutationObserver(function () {
-			// Debounce to avoid recursive loop (our style changes trigger mutations)
-			if (timer) clearTimeout(timer);
-			timer = setTimeout(function () {
-				observer.disconnect();
-				_fix_grid_wrapping(frm);
-				let target = $grid.find(".grid-body")[0];
-				if (target) {
-					observer.observe(target, { childList: true, subtree: true, attributes: true });
-				}
-			}, 50);
+	// Hook into grid row toggle to re-apply wrapping after edit mode exits
+	if (!frm._grid_wrap_hooked) {
+		frm._grid_wrap_hooked = true;
+
+		// Patch toggle_editable_row on each grid row to re-apply wrapping after
+		let grid = frm.fields_dict.account_mappings.grid;
+		let orig_refresh = grid.refresh.bind(grid);
+		grid.refresh = function () {
+			orig_refresh();
+			setTimeout(function () { _fix_grid_wrapping(frm); }, 10);
+		};
+
+		// Also listen for clicks outside the grid to re-apply
+		$(document).on("click.simplefin_grid", function (e) {
+			if (!$(e.target).closest('[data-fieldname="account_mappings"]').length) {
+				setTimeout(function () { _fix_grid_wrapping(frm); }, 50);
+			}
 		});
-		let target = $grid.find(".grid-body")[0];
-		if (target) {
-			observer.observe(target, { childList: true, subtree: true, attributes: true });
-			frm._grid_wrap_observer = observer;
-		}
 	}
 }
