@@ -8,6 +8,11 @@ const CONN_METHOD =
 frappe.ui.form.on("SimpleFIN Connection", {
 	refresh(frm) {
 		// --- Setup wizard on new connection ---
+		// Reset the flag when navigating to a new doc (Frappe reuses the form controller)
+		if (!frm.is_new()) {
+			frm._wizard_shown = false;
+			frm._guide_shown = false;
+		}
 		if (frm.is_new() && !frm._wizard_shown) {
 			frm._wizard_shown = true;
 			_show_setup_wizard(frm);
