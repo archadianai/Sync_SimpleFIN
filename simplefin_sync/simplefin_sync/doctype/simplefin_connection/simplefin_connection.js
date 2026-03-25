@@ -90,10 +90,10 @@ frappe.ui.form.on("SimpleFIN Connection", {
 									grid.refresh();
 								});
 
-							// Normalize all buttons to same class and size
-							let btn_style = {"padding": "4px 10px", "font-size": "12px", "line-height": "1.5"};
+							// Normalize all buttons — strip pull-right (conflicts with flex)
+							let btn_style = {"padding": "4px 10px", "font-size": "12px", "line-height": "1.5", "float": "none"};
 							[$move, $collapse, $cancel, $delete].forEach(function ($btn) {
-								$btn.removeClass("btn-sm").addClass("btn-sm").css(btn_style);
+								$btn.removeClass("pull-right btn-sm").addClass("btn-sm").css(btn_style);
 							});
 
 							// Clear and rebuild with grouped layout
