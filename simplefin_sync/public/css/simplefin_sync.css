@@ -1,19 +1,33 @@
 /* Allow text wrapping in Account Mapping grid cells */
-.frappe-control[data-fieldname="account_mappings"] .rows .row .static-area,
-.frappe-control[data-fieldname="account_mappings"] .rows .row .field-area .like-disabled-input {
+.frappe-control[data-fieldname="account_mappings"] .grid-overflow-no-ellipsis,
+.frappe-control[data-fieldname="account_mappings"] .grid-overflow-ellipsis {
+	overflow: visible !important;
+	text-overflow: unset !important;
+	white-space: normal !important;
+	word-break: break-word;
+}
+
+.frappe-control[data-fieldname="account_mappings"] .rows .row .static-area {
 	white-space: normal !important;
 	word-break: break-word;
 	line-height: 1.4;
+	overflow: visible !important;
 }
 
 /* Ensure grid rows expand to fit wrapped content */
-.frappe-control[data-fieldname="account_mappings"] .rows .row {
+.frappe-control[data-fieldname="account_mappings"] .grid-row {
+	height: auto !important;
 	min-height: auto !important;
-	padding-top: 4px;
-	padding-bottom: 4px;
 }
 
-.frappe-control[data-fieldname="account_mappings"] .row-index,
-.frappe-control[data-fieldname="account_mappings"] .grid-row .row {
-	align-items: center;
+.frappe-control[data-fieldname="account_mappings"] .row-data,
+.frappe-control[data-fieldname="account_mappings"] .row-data > .row {
+	height: auto !important;
+	min-height: auto !important;
+}
+
+.frappe-control[data-fieldname="account_mappings"] .grid-static-col {
+	overflow: visible !important;
+	padding-top: 8px !important;
+	padding-bottom: 8px !important;
 }
