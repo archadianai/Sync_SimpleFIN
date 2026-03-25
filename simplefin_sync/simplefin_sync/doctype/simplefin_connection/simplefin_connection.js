@@ -34,10 +34,7 @@ frappe.ui.form.on("SimpleFIN Connection", {
 		if (frm.fields_dict.account_mappings) {
 			frm.fields_dict.account_mappings.grid.cannot_add_rows = false;
 			frm.fields_dict.account_mappings.grid.grid_buttons.find(".grid-duplicate-row").hide();
-			// Remove ellipsis class so text wraps naturally
-			frm.fields_dict.account_mappings.$wrapper
-				.find(".static-area.ellipsis")
-				.removeClass("ellipsis");
+			_fix_grid_wrapping(frm);
 		}
 
 		// Show the system timezone on the Sync Time field description
@@ -497,4 +494,45 @@ function _has_mapped_accounts(frm) {
 	return (frm.doc.account_mappings || []).some(function (m) {
 		return m.erpnext_bank_account;
 	});
+}
+
+function _fix_grid_wrapping(frm) {
+	let $grid = frm.fields_dict.account_mappings.$wrapper;
+
+	// Force inline styles on every element in the constraint chain
+	$grid.find(".form-grid").css({
+		"overflow": "visible",
+	});
+	$grid.find(".data-row").css({
+		"height": "auto",
+	});
+	$grid.find(".grid-static-col").css({
+		"height": "auto",
+		"max-height": "none",
+		"overflow": "visible",
+		"padding-top": "8px",
+		"padding-bottom": "8px",
+	});
+	$grid.find(".static-area").each(function () {
+		$(this).removeClass("ellipsis").css({
+			"white-space": "normal",
+			"overflow": "visible",
+			"text-overflow": "unset",
+			"word-break": "break-word",
+			"max-width": "none",
+			"line-height": "1.4",
+		});
+	});
+
+	// Re-apply after grid re-renders (click in/out of cells)
+	if (!frm._grid_wrap_observer) {
+		let observer = new MutationObserver(function () {
+			_fix_grid_wrapping(frm);
+		});
+		let target = $grid.find(".grid-body")[0];
+		if (target) {
+			observer.observe(target, { childList: true, subtree: true });
+			frm._grid_wrap_observer = observer;
+		}
+	}
 }
