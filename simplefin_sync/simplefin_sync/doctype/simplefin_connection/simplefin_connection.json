@@ -41,8 +41,6 @@
   "column_break_notif",
   "on_record_mismatch",
   "notification_recipients",
-  "section_timezone",
-  "transaction_timezone",
   "section_mappings",
   "account_mappings",
   "section_status",
@@ -290,19 +288,6 @@
    "fieldtype": "Small Text",
    "label": "Notification Recipients",
    "description": "Comma-separated email addresses (used when Email is selected)"
-  },
-  {
-   "fieldname": "section_timezone",
-   "fieldtype": "Section Break",
-   "label": "Timezone"
-  },
-  {
-   "fieldname": "transaction_timezone",
-   "fieldtype": "Select",
-   "label": "Transaction Timezone",
-   "options": "",
-   "reqd": 1,
-   "description": "Your bank's local timezone — used to determine the correct calendar date for each transaction, since SimpleFIN provides timestamps in UTC."
   },
   {
    "fieldname": "section_mappings",

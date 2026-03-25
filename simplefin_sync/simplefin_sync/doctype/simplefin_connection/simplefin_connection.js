@@ -43,12 +43,6 @@ frappe.ui.form.on("SimpleFIN Connection", {
 	},
 
 	refresh(frm) {
-		// Apply timezone options on every refresh (including after reload_doc)
-		if (frm._tz_options && frm.fields_dict.transaction_timezone) {
-			frm.fields_dict.transaction_timezone.df.options = frm._tz_options;
-			frm.refresh_field("transaction_timezone");
-		}
-
 		// Show the system timezone on the Sync Time field description
 		let sys_tz = frappe.boot.time_zone?.system || frappe.sys_defaults?.time_zone || "";
 		if (sys_tz && frm.fields_dict.sync_time) {
@@ -137,6 +131,23 @@ frappe.ui.form.on("SimpleFIN Connection", {
 			frm.dashboard.set_headline_alert(
 				'<span class="indicator whitespace-nowrap red">' + __("Unregistered") + "</span>"
 			);
+		}
+	},
+});
+
+// Populate timezone options on Account Mapping child table rows
+frappe.ui.form.on("SimpleFIN Account Mapping", {
+	form_render(frm, cdt, cdn) {
+		if (frm._tz_options) {
+			let row = locals[cdt][cdn];
+			let grid_row = frm.fields_dict.account_mappings.grid.grid_rows_by_docname[cdn];
+			if (grid_row) {
+				let tz_field = grid_row.get_field("transaction_timezone");
+				if (tz_field) {
+					tz_field.df.options = frm._tz_options;
+					tz_field.refresh();
+				}
+			}
 		}
 	},
 });

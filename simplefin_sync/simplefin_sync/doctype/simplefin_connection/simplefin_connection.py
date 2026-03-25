@@ -26,13 +26,6 @@ FREQUENCY_MINUTES = {
 class SimpleFINConnection(Document):
 	"""A configured connection to a SimpleFIN Bridge access token."""
 
-	def before_insert(self) -> None:
-		if not self.transaction_timezone:
-			self.transaction_timezone = (
-				frappe.db.get_single_value("System Settings", "time_zone")
-				or "UTC"
-			)
-
 	def validate(self) -> None:
 		self._validate_enabled_requires_registration()
 		self._validate_sync_day_of_month()
@@ -385,6 +378,7 @@ def _populate_account_mappings(conn, client) -> None:
 
 	existing_ids = {m.simplefin_account_id for m in (conn.account_mappings or [])}
 	now = now_datetime()
+	default_tz = frappe.db.get_single_value("System Settings", "time_zone") or "UTC"
 	changed = False
 
 	# Update org info
@@ -406,6 +400,7 @@ def _populate_account_mappings(conn, client) -> None:
 			"simplefin_org_domain": acct_org.get("domain", ""),
 			"simplefin_org_name": acct_org.get("name", ""),
 			"simplefin_currency": acct.get("currency", ""),
+			"transaction_timezone": default_tz,
 			"is_active": 0,
 			"first_seen": now,
 			"last_seen": now,

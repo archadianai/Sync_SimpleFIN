@@ -47,8 +47,7 @@ The installer automatically creates custom fields on the Bank Transaction doctyp
 1. In ERPNext, go to **SimpleFIN Sync** in the sidebar (or search for "SimpleFIN Connection")
 2. Click **New SimpleFIN Connection**
 3. Enter a name (e.g., "BECU Business") and paste your Setup Token
-4. Set the **Transaction Timezone** to your bank's local timezone
-5. Click **Save**
+4. Click **Save**
 
 ### 3. Register and Map Accounts
 
@@ -57,7 +56,7 @@ After saving, you'll be prompted to register with SimpleFIN Bridge. The registra
 - Fetches your bank accounts and populates the Account Mappings table
 
 Then:
-1. For each account you want to sync, set the **ERPNext Bank Account** (Link field) and check **Active**
+1. For each account you want to sync, set the **ERPNext Bank Account** (Link field) and verify the **Transaction Timezone** matches the bank's local timezone
 2. Check the **Enabled** checkbox at the top of the form
 3. Click **Save**, then **Actions > Sync Now** (or **Actions > Enable & Sync Now**)
 
