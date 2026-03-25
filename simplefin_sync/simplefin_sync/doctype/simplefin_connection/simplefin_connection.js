@@ -549,10 +549,14 @@ function _fix_grid_wrapping(frm) {
 			setTimeout(function () { _fix_grid_wrapping(frm); }, 10);
 		};
 
-		// Also listen for clicks outside the grid to re-apply
+		// Listen for clicks outside the grid to re-apply after Frappe
+		// finishes toggling the row back to static mode. Multiple delays
+		// to catch Frappe's async render cycle.
 		$(document).on("click.simplefin_grid", function (e) {
 			if (!$(e.target).closest('[data-fieldname="account_mappings"]').length) {
-				setTimeout(function () { _fix_grid_wrapping(frm); }, 50);
+				setTimeout(function () { _fix_grid_wrapping(frm); }, 100);
+				setTimeout(function () { _fix_grid_wrapping(frm); }, 300);
+				setTimeout(function () { _fix_grid_wrapping(frm); }, 500);
 			}
 		});
 	}
