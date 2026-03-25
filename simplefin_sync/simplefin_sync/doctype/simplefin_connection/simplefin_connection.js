@@ -524,6 +524,19 @@ function _fix_grid_wrapping(frm) {
 		});
 	});
 
+	// Also fix editable-row inputs so they don't collapse height
+	$grid.find(".editable-row .grid-static-col").css({
+		"height": "auto",
+		"max-height": "none",
+		"overflow": "visible",
+	});
+	$grid.find(".editable-row .field-area").css({
+		"overflow": "visible",
+	});
+	$grid.find(".editable-row .form-group").css({
+		"margin-bottom": "0",
+	});
+
 	// Re-apply after grid re-renders (click in/out of cells)
 	if (!frm._grid_wrap_observer) {
 		let observer = new MutationObserver(function () {
