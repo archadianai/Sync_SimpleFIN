@@ -1,26 +1,30 @@
 /* ----------------------------------------------------------------
-   Account Mapping grid — allow text wrapping in all cells.
-   Frappe applies an 'ellipsis' class to .static-area which sets
-   overflow:hidden, text-overflow:ellipsis, white-space:nowrap.
-   We override this plus all container height constraints.
+   Account Mapping grid — allow text wrapping.
+   Frappe sets height:32px on .grid-static-col and overflow:hidden
+   on .form-grid, which clips wrapped text.
    ---------------------------------------------------------------- */
 
-.frappe-control[data-fieldname="account_mappings"] .static-area.ellipsis {
+.frappe-control[data-fieldname="account_mappings"] .grid-static-col {
+	height: auto !important;
+	max-height: none !important;
+	overflow: visible !important;
+	padding-top: 8px !important;
+	padding-bottom: 8px !important;
+}
+
+.frappe-control[data-fieldname="account_mappings"] .static-area {
 	white-space: normal !important;
 	overflow: visible !important;
 	text-overflow: unset !important;
 	word-break: break-word !important;
 	line-height: 1.4 !important;
+	max-width: none !important;
 }
 
-.frappe-control[data-fieldname="account_mappings"] .grid-static-col {
+.frappe-control[data-fieldname="account_mappings"] .form-grid {
 	overflow: visible !important;
-	align-self: stretch !important;
-	padding-top: 8px !important;
-	padding-bottom: 8px !important;
 }
 
 .frappe-control[data-fieldname="account_mappings"] .data-row {
-	min-height: 0 !important;
 	height: auto !important;
 }
