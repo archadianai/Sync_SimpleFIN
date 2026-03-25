@@ -30,9 +30,14 @@ frappe.ui.form.on("SimpleFIN Connection", {
 			);
 		}
 
-		// Hide duplicate row button on Account Mappings grid
+		// Account Mappings grid fixes
 		if (frm.fields_dict.account_mappings) {
 			frm.fields_dict.account_mappings.grid.grid_buttons.find(".grid-duplicate-row").hide();
+			// Remove ellipsis class and force row heights for text wrapping
+			let $grid = frm.fields_dict.account_mappings.$wrapper;
+			$grid.find(".static-area.ellipsis").removeClass("ellipsis");
+			$grid.find(".grid-static-col").css({"height": "auto", "max-height": "none"});
+			$grid.find(".data-row").css("height", "auto");
 		}
 
 		// Show the system timezone on the Sync Time field description
