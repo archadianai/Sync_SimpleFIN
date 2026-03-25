@@ -90,8 +90,14 @@ frappe.ui.form.on("SimpleFIN Connection", {
 									grid.refresh();
 								});
 
+							// Normalize all buttons to same class and size
+							let btn_style = {"padding": "4px 10px", "font-size": "12px", "line-height": "1.5"};
+							[$move, $collapse, $cancel, $delete].forEach(function ($btn) {
+								$btn.removeClass("btn-sm").addClass("btn-sm").css(btn_style);
+							});
+
 							// Clear and rebuild with grouped layout
-							$actions.empty().css("display", "flex").css("align-items", "center").css("gap", "4px");
+							$actions.empty().css({"display": "flex", "align-items": "center", "gap": "4px"});
 							let $left = $('<span class="btn-group btn-group-sm"></span>').appendTo($actions);
 							$left.append($move).append($collapse);
 							$('<span style="flex-grow:1"></span>').appendTo($actions);
