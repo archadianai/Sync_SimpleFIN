@@ -246,14 +246,6 @@ function _wizard_step1_register(d, state, values) {
 function _build_account_mapping_html(data) {
 	let html = "";
 
-	if (data.org_name) {
-		html += `<div class="mb-3"><b>${frappe.utils.escape_html(data.org_name)}</b>`;
-		if (data.org_domain) {
-			html += ` <span class="text-muted">(${frappe.utils.escape_html(data.org_domain)})</span>`;
-		}
-		html += "</div>";
-	}
-
 	// Group accounts by org_name
 	let groups = {};
 	for (let acct of data.accounts) {

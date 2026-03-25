@@ -199,10 +199,6 @@ def _do_sync(conn, sync_log) -> None:
 		accounts = data.get("accounts", [])
 		sync_log.accounts_retrieved = (sync_log.accounts_retrieved or 0) + len(accounts)
 
-		# Update org info on first sync
-		if accounts and not conn.org_name:
-			_update_org_info(conn, accounts[0])
-
 		# Auto-discover and update account mappings
 		_update_account_mappings(conn, accounts)
 
@@ -234,7 +230,7 @@ def _do_sync(conn, sync_log) -> None:
 					continue
 
 				result = _process_transaction(
-					txn, acct_id, mapping.erpnext_bank_account, conn,
+					txn, acct_id, mapping.erpnext_bank_account, conn, mapping,
 				)
 				if result == "created":
 					chunk_created += 1
@@ -352,6 +348,7 @@ def _process_transaction(
 	account_id: str,
 	bank_account: str,
 	conn,
+	mapping=None,
 ) -> str:
 	"""Process a single transaction. Returns 'created', 'duplicate', 'cancelled', or 'mismatch'."""
 	txn_id = txn.get("id")
@@ -439,7 +436,7 @@ def _process_transaction(
 	sanitized_desc = frappe.utils.escape_html(description)[:500] if description else ""
 
 	# Enrichment
-	enriched = enrich_transaction(description, txn.get("extra"), conn)
+	enriched = enrich_transaction(description, txn.get("extra"), mapping or conn)
 
 	bt = frappe.get_doc({
 		"doctype": "Bank Transaction",
@@ -518,6 +515,8 @@ def _update_account_mappings(conn, accounts: list[dict]) -> None:
 				"simplefin_org_name": org.get("name", ""),
 				"simplefin_currency": acct.get("currency", ""),
 				"is_active": 0,
+				"extract_reference_number": 1,
+				"extract_party_name": 1,
 				"first_seen": now,
 				"last_seen": now,
 			})
@@ -564,20 +563,6 @@ def _update_account_mappings(conn, accounts: list[dict]) -> None:
 						m.simplefin_account_name, m.simplefin_account_id, acct.get("id")
 					),
 				)
-
-
-def _update_org_info(conn, account: dict) -> None:
-	"""Populate org fields on the connection from the first account response."""
-	org = account.get("org", {})
-	if not org:
-		return
-
-	conn.reload()
-	conn.org_domain = org.get("domain", "")
-	conn.org_name = org.get("name", "")
-	conn.org_url = org.get("url", "")
-	conn.save(ignore_permissions=True)
-	frappe.db.commit()
 
 
 # ---------------------------------------------------------------------------

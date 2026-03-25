@@ -30,8 +30,6 @@ class SimpleFINConnection(Document):
 		self._validate_enabled_requires_registration()
 		self._validate_sync_day_of_month()
 		self._validate_retry_window()
-		self._validate_custom_regex("custom_reference_regex", _("Custom Reference Regex"))
-		self._validate_custom_regex("custom_party_regex", _("Custom Party Regex"))
 		self._auto_activate_mapped_accounts()
 		self._compute_next_scheduled_sync()
 
@@ -69,22 +67,6 @@ class SimpleFINConnection(Document):
 					self.retry_interval_minutes,
 					max_retry_window,
 					sync_interval,
-				)
-			)
-
-	def _validate_custom_regex(self, field: str, label: str) -> None:
-		"""Validate a custom regex pattern compiles and has exactly one capture group."""
-		pattern = self.get(field)
-		if not pattern:
-			return
-		try:
-			compiled = re.compile(pattern)
-		except re.error as e:
-			frappe.throw(_("Invalid regex in {0}: {1}").format(label, str(e)))
-		if compiled.groups != 1:
-			frappe.throw(
-				_("{0} must contain exactly one capture group. Found {1}.").format(
-					label, compiled.groups
 				)
 			)
 
@@ -474,8 +456,6 @@ def wizard_register(connection_name: str, setup_token: str) -> dict:
 
 	return {
 		"connection": conn.name,
-		"org_name": conn.org_name or "",
-		"org_domain": conn.org_domain or "",
 		"accounts": accounts,
 	}
 
@@ -535,14 +515,6 @@ def _populate_account_mappings(conn, client) -> None:
 	now = now_datetime()
 	changed = False
 
-	# Update org info
-	org = accounts[0].get("org", {})
-	if org and not conn.org_name:
-		conn.org_name = org.get("name", "")
-		conn.org_domain = org.get("domain", "")
-		conn.org_url = org.get("url", "")
-		changed = True
-
 	for acct in accounts:
 		acct_id = acct.get("id")
 		if not acct_id or acct_id in existing_ids:
@@ -555,6 +527,8 @@ def _populate_account_mappings(conn, client) -> None:
 			"simplefin_org_name": acct_org.get("name", ""),
 			"simplefin_currency": acct.get("currency", ""),
 			"is_active": 0,
+			"extract_reference_number": 1,
+			"extract_party_name": 1,
 			"first_seen": now,
 			"last_seen": now,
 		})

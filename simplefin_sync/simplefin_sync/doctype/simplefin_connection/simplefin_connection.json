@@ -13,10 +13,6 @@
   "is_registered",
   "enabled",
   "registration_date",
-  "section_org",
-  "org_domain",
-  "org_name",
-  "org_url",
   "section_schedule",
   "sync_frequency",
   "sync_time",
@@ -29,12 +25,6 @@
   "rolling_window_days",
   "section_pending",
   "include_pending",
-  "section_enrichment",
-  "extract_reference_number",
-  "custom_reference_regex",
-  "column_break_enrichment",
-  "extract_party_name",
-  "custom_party_regex",
   "section_notifications",
   "on_sync_failure",
   "on_empty_account",
@@ -115,30 +105,6 @@
    "read_only": 1
   },
   {
-   "collapsible": 1,
-   "fieldname": "section_org",
-   "fieldtype": "Section Break",
-   "label": "Organization Info"
-  },
-  {
-   "fieldname": "org_domain",
-   "fieldtype": "Data",
-   "label": "Institution Domain",
-   "read_only": 1
-  },
-  {
-   "fieldname": "org_name",
-   "fieldtype": "Data",
-   "label": "Institution Name",
-   "read_only": 1
-  },
-  {
-   "fieldname": "org_url",
-   "fieldtype": "Data",
-   "label": "Institution URL",
-   "read_only": 1
-  },
-  {
    "fieldname": "section_schedule",
    "fieldtype": "Section Break",
    "label": "Sync Schedule"
@@ -215,41 +181,6 @@
    "fieldname": "include_pending",
    "fieldtype": "Check",
    "label": "Include Pending Transactions"
-  },
-  {
-   "fieldname": "section_enrichment",
-   "fieldtype": "Section Break",
-   "label": "Transaction Enrichment"
-  },
-  {
-   "default": "1",
-   "fieldname": "extract_reference_number",
-   "fieldtype": "Check",
-   "label": "Extract Reference Number"
-  },
-  {
-   "depends_on": "eval:doc.extract_reference_number",
-   "fieldname": "custom_reference_regex",
-   "fieldtype": "Small Text",
-   "label": "Custom Reference Regex",
-   "description": "Custom regex with one capture group. Leave blank for built-in patterns."
-  },
-  {
-   "fieldname": "column_break_enrichment",
-   "fieldtype": "Column Break"
-  },
-  {
-   "default": "1",
-   "fieldname": "extract_party_name",
-   "fieldtype": "Check",
-   "label": "Extract Party Name"
-  },
-  {
-   "depends_on": "eval:doc.extract_party_name",
-   "fieldname": "custom_party_regex",
-   "fieldtype": "Small Text",
-   "label": "Custom Party Regex",
-   "description": "Custom regex with one capture group. Leave blank for built-in patterns."
   },
   {
    "fieldname": "section_notifications",

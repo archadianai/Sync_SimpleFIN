@@ -12,6 +12,11 @@
   "simplefin_currency",
   "erpnext_bank_account",
   "is_active",
+  "section_enrichment",
+  "extract_reference_number",
+  "custom_reference_regex",
+  "extract_party_name",
+  "custom_party_regex",
   "missing_from_simplefin",
   "first_seen",
   "last_seen"
@@ -58,6 +63,37 @@
    "fieldtype": "Check",
    "in_list_view": 1,
    "label": "Active"
+  },
+  {
+   "fieldname": "section_enrichment",
+   "fieldtype": "Section Break",
+   "label": "Transaction Enrichment"
+  },
+  {
+   "default": "1",
+   "fieldname": "extract_reference_number",
+   "fieldtype": "Check",
+   "label": "Extract Reference Number"
+  },
+  {
+   "depends_on": "eval:doc.extract_reference_number",
+   "fieldname": "custom_reference_regex",
+   "fieldtype": "Small Text",
+   "label": "Custom Reference Regex",
+   "description": "Custom regex with one capture group. Leave blank for built-in patterns."
+  },
+  {
+   "default": "1",
+   "fieldname": "extract_party_name",
+   "fieldtype": "Check",
+   "label": "Extract Party Name"
+  },
+  {
+   "depends_on": "eval:doc.extract_party_name",
+   "fieldname": "custom_party_regex",
+   "fieldtype": "Small Text",
+   "label": "Custom Party Regex",
+   "description": "Custom regex with one capture group. Leave blank for built-in patterns."
   },
   {
    "default": "0",
