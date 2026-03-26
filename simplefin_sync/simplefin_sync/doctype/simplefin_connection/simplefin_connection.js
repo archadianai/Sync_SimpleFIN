@@ -139,7 +139,7 @@ frappe.ui.form.on("SimpleFIN Connection", {
 				_do_register(frm);
 			}, __("Actions"));
 		}
-		if (!frm.is_new() && frm.doc.connection_status === "Revoked") {
+		if (!frm.is_new() && frm.doc.is_registered) {
 			frm.add_custom_button(__("Re-register"), function () {
 				_do_reregister(frm);
 			}, __("Actions"));

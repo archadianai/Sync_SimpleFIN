@@ -13,6 +13,7 @@
   "is_registered",
   "enabled",
   "registration_date",
+  "simplefin_server",
   "section_schedule",
   "sync_frequency",
   "sync_time",
@@ -102,6 +103,13 @@
    "fieldname": "registration_date",
    "fieldtype": "Datetime",
    "label": "Registration Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "simplefin_server",
+   "fieldtype": "Data",
+   "label": "SimpleFIN Server",
+   "description": "Server hosting the SimpleFIN endpoint (extracted from access URL)",
    "read_only": 1
   },
   {

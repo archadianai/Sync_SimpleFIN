@@ -3,6 +3,7 @@
 # License: GPL-3.0
 
 import re
+from urllib.parse import urlparse
 
 import frappe
 from frappe import _
@@ -141,6 +142,14 @@ class SimpleFINConnection(Document):
 _DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 
+def _extract_server(access_url: str) -> str:
+	"""Extract the hostname from an access URL."""
+	try:
+		return urlparse(access_url).hostname or ""
+	except Exception:
+		return ""
+
+
 def _parse_sync_time(time_val) -> tuple[int, int]:
 	"""Parse a time value into (hour, minute)."""
 	if not time_val:
@@ -186,8 +195,8 @@ def reregister(connection: str, setup_token: str) -> None:
 
 	conn = frappe.get_doc("SimpleFIN Connection", connection)
 
-	if conn.connection_status != "Revoked":
-		frappe.throw(_("Re-register is only available for revoked connections."))
+	if not conn.is_registered:
+		frappe.throw(_("Connection must be registered first before re-registering."))
 
 	try:
 		access_url = SimpleFINClient.claim_access_url(setup_token.strip())
@@ -202,6 +211,7 @@ def reregister(connection: str, setup_token: str) -> None:
 		frappe.throw(_("Registration failed: {0}").format(str(e)))
 
 	conn.access_url = access_url
+	conn.simplefin_server = _extract_server(access_url)
 	conn.connection_status = "Active"
 	conn.registration_date = now_datetime()
 	conn.enabled = 1
@@ -240,6 +250,7 @@ def register_token(connection: str) -> None:
 		frappe.throw(_("Registration failed: {0}").format(str(e)))
 
 	conn.access_url = access_url
+	conn.simplefin_server = _extract_server(access_url)
 	conn.is_registered = 1
 	conn.setup_token = ""
 	conn.registration_date = now_datetime()
@@ -424,6 +435,7 @@ def wizard_register(connection_name: str, setup_token: str) -> dict:
 
 	# Store credentials
 	conn.access_url = access_url
+	conn.simplefin_server = _extract_server(access_url)
 	conn.is_registered = 1
 	conn.setup_token = ""
 	conn.registration_date = now_datetime()
