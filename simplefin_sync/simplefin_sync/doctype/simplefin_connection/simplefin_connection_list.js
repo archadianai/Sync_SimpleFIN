@@ -3,6 +3,9 @@
 // License: GPL-3.0
 
 frappe.listview_settings["SimpleFIN Connection"] = {
+	// Show all connections by default (Frappe auto-hides disabled records)
+	filters: [["enabled", "like", "%"]],
+
 	get_indicator(doc) {
 		// Rate Limited (takes priority)
 		if (doc.rate_limit_paused_until) {
