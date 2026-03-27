@@ -27,7 +27,12 @@ setup_token
 .DS_Store
 Thumbs.db
 
-# Docker volumes (not the compose file)
+# Development environment (contains credentials via .env)
+docker-compose.yml
+init-bench.sh
+claude-docs/
+
+# Docker volumes
 docker-data/
 
 # Frappe build artifacts
