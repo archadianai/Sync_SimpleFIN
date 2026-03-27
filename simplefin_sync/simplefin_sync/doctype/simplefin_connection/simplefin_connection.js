@@ -90,6 +90,19 @@ frappe.ui.form.on("SimpleFIN Connection", {
 									grid.refresh();
 								});
 
+							// Restyle Delete: remove red, add confirmation
+							$delete.removeClass("btn-danger").addClass("btn-secondary");
+							let orig_delete_handler = $._data($delete[0], "events");
+							$delete.off("click").on("click", function (ev) {
+								ev.stopPropagation();
+								frappe.confirm(
+									__("Delete this account mapping? This cannot be undone."),
+									function () {
+										grid_row.remove();
+									}
+								);
+							});
+
 							// Normalize all buttons — force identical height
 							[$move, $collapse, $cancel, $delete].forEach(function ($btn) {
 								$btn.removeClass("pull-right hidden-xs");
