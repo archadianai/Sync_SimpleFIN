@@ -45,6 +45,7 @@
    "in_standard_filter": 1,
    "label": "Connection",
    "options": "SimpleFIN Connection",
+   "read_only": 1,
    "reqd": 1
   },
   {
@@ -54,6 +55,7 @@
    "in_standard_filter": 1,
    "label": "Sync Type",
    "options": "Scheduled\nManual\nTest",
+   "read_only": 1,
    "reqd": 1
   },
   {
@@ -63,6 +65,7 @@
    "in_standard_filter": 1,
    "label": "Status",
    "options": "In Progress\nSuccess\nPartial Success\nFailed",
+   "read_only": 1,
    "reqd": 1
   },
   {
@@ -74,12 +77,14 @@
    "fieldtype": "Datetime",
    "in_list_view": 1,
    "label": "Started At",
+   "read_only": 1,
    "reqd": 1
   },
   {
    "fieldname": "completed_at",
    "fieldtype": "Datetime",
-   "label": "Completed At"
+   "label": "Completed At",
+   "read_only": 1
   },
   {
    "fieldname": "section_date_range",
@@ -89,12 +94,14 @@
   {
    "fieldname": "request_start_date",
    "fieldtype": "Datetime",
-   "label": "Request Start Date"
+   "label": "Request Start Date",
+   "read_only": 1
   },
   {
    "fieldname": "request_end_date",
    "fieldtype": "Datetime",
-   "label": "Request End Date"
+   "label": "Request End Date",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_dates",
@@ -103,7 +110,8 @@
   {
    "fieldname": "actual_data_end_date",
    "fieldtype": "Datetime",
-   "label": "Actual Data End Date"
+   "label": "Actual Data End Date",
+   "read_only": 1
   },
   {
    "fieldname": "section_chunks",
@@ -113,17 +121,20 @@
   {
    "fieldname": "chunks_requested",
    "fieldtype": "Int",
-   "label": "Chunks Requested"
+   "label": "Chunks Requested",
+   "read_only": 1
   },
   {
    "fieldname": "chunks_completed",
    "fieldtype": "Int",
-   "label": "Chunks Completed"
+   "label": "Chunks Completed",
+   "read_only": 1
   },
   {
    "fieldname": "chunks_empty",
    "fieldtype": "Int",
-   "label": "Chunks Empty"
+   "label": "Chunks Empty",
+   "read_only": 1
   },
   {
    "fieldname": "section_counts",
@@ -133,12 +144,14 @@
   {
    "fieldname": "accounts_retrieved",
    "fieldtype": "Int",
-   "label": "Accounts Retrieved"
+   "label": "Accounts Retrieved",
+   "read_only": 1
   },
   {
    "fieldname": "transactions_retrieved",
    "fieldtype": "Int",
-   "label": "Transactions Retrieved"
+   "label": "Transactions Retrieved",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_counts",
@@ -147,27 +160,32 @@
   {
    "fieldname": "transactions_created",
    "fieldtype": "Int",
-   "label": "Transactions Created"
+   "label": "Transactions Created",
+   "read_only": 1
   },
   {
    "fieldname": "transactions_skipped_duplicate",
    "fieldtype": "Int",
-   "label": "Skipped (Duplicate)"
+   "label": "Skipped (Duplicate)",
+   "read_only": 1
   },
   {
    "fieldname": "transactions_skipped_pending",
    "fieldtype": "Int",
-   "label": "Skipped (Pending)"
+   "label": "Skipped (Pending)",
+   "read_only": 1
   },
   {
    "fieldname": "transactions_skipped_cancelled",
    "fieldtype": "Int",
-   "label": "Skipped (Cancelled)"
+   "label": "Skipped (Cancelled)",
+   "read_only": 1
   },
   {
    "fieldname": "transactions_mismatched",
    "fieldtype": "Int",
-   "label": "Mismatched"
+   "label": "Mismatched",
+   "read_only": 1
   },
   {
    "fieldname": "section_rate_limit",
@@ -178,7 +196,8 @@
    "default": "0",
    "fieldname": "rate_limit_warning_received",
    "fieldtype": "Check",
-   "label": "Rate Limit Warning Received"
+   "label": "Rate Limit Warning Received",
+   "read_only": 1
   },
   {
    "fieldname": "section_errors",
@@ -188,12 +207,14 @@
   {
    "fieldname": "simplefin_errors",
    "fieldtype": "Small Text",
-   "label": "SimpleFIN Errors"
+   "label": "SimpleFIN Errors",
+   "read_only": 1
   },
   {
    "fieldname": "error_message",
    "fieldtype": "Long Text",
-   "label": "Error Message"
+   "label": "Error Message",
+   "read_only": 1
   },
   {
    "fieldname": "section_balance",
@@ -204,7 +225,8 @@
    "fieldname": "balance_snapshot",
    "fieldtype": "Table",
    "label": "Balance Snapshot",
-   "options": "SimpleFIN Balance Snapshot"
+   "options": "SimpleFIN Balance Snapshot",
+   "read_only": 1
   }
  ],
  "links": [],
