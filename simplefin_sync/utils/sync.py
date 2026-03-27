@@ -49,11 +49,15 @@ COMMIT_BATCH_SIZE = 100
 # Public entry point
 # ---------------------------------------------------------------------------
 
-def run_sync(connection: str) -> None:
+def run_sync(connection: str, sync_type: str = "Manual") -> None:
 	"""Run a full sync for the given SimpleFIN Connection.
 
 	Called from ``frappe.enqueue`` via the scheduler or the *Sync Now* button.
 	Manages state-machine transitions per spec Section 6.4.
+
+	Args:
+		connection: SimpleFIN Connection document name.
+		sync_type: "Scheduled", "Manual", or "Test".
 	"""
 	conn = frappe.get_doc("SimpleFIN Connection", connection)
 
@@ -63,7 +67,7 @@ def run_sync(connection: str) -> None:
 	conn.save(ignore_permissions=True)
 	frappe.db.commit()
 
-	sync_log = _create_sync_log(conn, "Scheduled" if frappe.flags.in_scheduler else "Manual")
+	sync_log = _create_sync_log(conn, sync_type)
 
 	try:
 		_do_sync(conn, sync_log)

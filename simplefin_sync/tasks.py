@@ -251,6 +251,7 @@ def _enqueue_sync(conn, reset_retries: bool) -> None:
 	frappe.enqueue(
 		"simplefin_sync.utils.sync.run_sync",
 		connection=conn.name,
+		sync_type="Scheduled",
 		queue="long",
 		deduplicate=True,
 		job_id=f"simplefin_sync_{conn.name}",
