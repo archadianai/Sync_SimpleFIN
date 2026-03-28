@@ -45,20 +45,18 @@ The installer automatically creates custom fields on the Bank Transaction doctyp
 ### 2. Create a Connection
 
 1. In ERPNext, go to **SimpleFIN Sync** in the sidebar (or search for "SimpleFIN Connection")
-2. Click **New SimpleFIN Connection**
-3. Enter a name (e.g., "BECU Business") and paste your Setup Token
-4. Click **Save**
+2. Click **New SimpleFIN Connection** — a setup wizard dialog appears
+3. **Step 1:** Enter a connection name (e.g., "BECU Business") and paste your Setup Token, then click **Register**
+4. **Step 2:** Your bank accounts appear grouped by institution. Set the **ERPNext Bank Account** for each account you want to sync, then click **Create Connection**
 
-### 3. Register and Map Accounts
+The wizard exchanges your token, discovers your accounts, maps them, and enables the connection — all in one flow.
 
-After saving, you'll be prompted to register with SimpleFIN Bridge. The registration:
-- Exchanges your setup token for an encrypted access credential (one-time operation)
-- Fetches your bank accounts and populates the Account Mappings table
+### 3. Review Settings and Sync
 
-Then:
-1. For each account you want to sync, set the **ERPNext Bank Account** (Link field) and verify the **Transaction Timezone** matches the bank's local timezone
-2. Check the **Enabled** checkbox at the top of the form
-3. Click **Save**, then **Actions > Sync Now** (or **Actions > Enable & Sync Now**)
+After the wizard completes, you'll land on the Connection form with a blue banner: *"Review your settings below, then use Actions → Sync Full to import transactions."*
+
+1. Review **Sync Schedule**, **Transaction Enrichment** (per account, in Account Mappings), and **Notification Settings**
+2. Click **Actions → Sync Full** to import your transaction history
 
 ### 4. Verify in Bank Reconciliation Tool
 
@@ -95,11 +93,11 @@ This fuzzy-matches the `bank_party_name` field (extracted by SimpleFIN Sync) aga
 
 ### Transaction Enrichment
 
-Each connection has toggles for:
+Enrichment settings are **per account** (in the Account Mappings table, click a row to edit). Each account has:
 - **Extract Reference Number** — Pulls check numbers, reference codes, and trace numbers from descriptions
 - **Extract Party Name** — Parses merchant/party names from bank descriptions
 
-Both support **custom regex** with one capture group for bank-specific formats. Leave blank to use the built-in patterns.
+Both support **custom regex** with one capture group for bank-specific formats. Leave blank to use the built-in patterns. Per-account settings allow different extraction patterns for different institutions on the same connection.
 
 ### Notifications
 
@@ -123,7 +121,7 @@ If a Bank Transaction is cancelled by mistake:
 
 1. **Delete** the cancelled Bank Transaction document (requires Accounts Manager or System Manager permission)
 2. On the **next scheduled sync**, if the transaction is still within the rolling window (default: 14 days), dedup will find no match and re-import it as a fresh record
-3. If the transaction has **aged out** of the rolling window, open the SimpleFIN Connection and click **Actions > Sync Now** to trigger a manual sync that covers the full initial history range
+3. If the transaction has **aged out** of the rolling window, open the SimpleFIN Connection and click **Actions > Sync Full** to re-pull the full history range
 
 Note: Cancelled transactions (docstatus=2) are intentionally retained in the dedup check to prevent unwanted re-imports. Deleting the record is what signals that a re-import is desired.
 
