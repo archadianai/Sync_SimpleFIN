@@ -52,7 +52,7 @@ Every `.py` and `.js` file must start with:
 
 ### DocType JSON Files
 - Generate via Frappe's DocType creation process or write by hand following the exact JSON schema that Frappe expects.
-- `"module": "SimpleFIN Sync"` for all doctypes.
+- `"module": "Sync via SimpleFIN"` for all doctypes.
 - `"engine": "InnoDB"` for all doctypes.
 - Child table doctypes: `"istable": 1`, `"editable_grid": 1`.
 - Single doctypes (Settings): `"issingle": 1`.
@@ -244,7 +244,7 @@ Follow this order strictly. Complete and verify each phase before starting the n
 
 ### Phase 7: Workspace and Polish
 
-1. **Create the SimpleFIN Sync workspace** with shortcuts to:
+1. **Create the Sync via SimpleFIN workspace** with shortcuts to:
    - SimpleFIN Connection (list)
    - SimpleFIN Sync Log (list)
    - SimpleFIN Sync Settings
@@ -357,7 +357,7 @@ bt.submit()  # CRITICAL: Bank Transaction is submittable — must submit for BRT
 # Sending notifications
 frappe.sendmail(
     recipients=recipient_list,
-    subject=frappe._("SimpleFIN Sync Failed: {0}").format(connection_name),
+    subject=frappe._("Sync via SimpleFIN Failed: {0}").format(connection_name),
     message=message_body,
 )
 

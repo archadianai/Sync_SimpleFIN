@@ -2,7 +2,7 @@
 
 Automatic bank transaction import via [SimpleFIN Bridge](https://beta-bridge.simplefin.org/info/developers) for ERPNext.
 
-SimpleFIN Sync connects ERPNext to your bank accounts through the SimpleFIN Bridge aggregation service. It periodically retrieves posted bank transactions and imports them as Bank Transaction records, ready for reconciliation using ERPNext's standard Bank Reconciliation Tool.
+Sync via SimpleFIN connects ERPNext to your bank accounts through the SimpleFIN Bridge aggregation service. It periodically retrieves posted bank transactions and imports them as Bank Transaction records, ready for reconciliation using ERPNext's standard Bank Reconciliation Tool.
 
 ## Features
 
@@ -40,7 +40,7 @@ The installer automatically creates custom fields on the Bank Transaction doctyp
 
 1. Go to [SimpleFIN Bridge](https://beta-bridge.simplefin.org/) and create an account (or log in)
 2. Connect your bank through the Bridge interface
-3. Generate a **Setup Token** — this is a one-time code that SimpleFIN Sync exchanges for a persistent access credential
+3. Generate a **Setup Token** — this is a one-time code that Sync via SimpleFIN exchanges for a persistent access credential
 
 ### 2. Create a Connection
 
@@ -75,7 +75,7 @@ ERPNext can automatically match imported transactions to existing Customers, Sup
 2. Click the **Others** tab
 3. Check **Enable Automatic Party Matching**
 
-This fuzzy-matches the `bank_party_name` field (extracted by SimpleFIN Sync) against your party records. It only works for newly synced transactions and requires the party to already exist in ERPNext.
+This fuzzy-matches the `bank_party_name` field (extracted by Sync via SimpleFIN) against your party records. It only works for newly synced transactions and requires the party to already exist in ERPNext.
 
 ## Configuration
 

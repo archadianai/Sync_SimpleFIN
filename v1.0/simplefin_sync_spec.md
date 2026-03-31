@@ -11,7 +11,7 @@
 
 ## 1. Overview
 
-SimpleFIN Sync is a Frappe/ERPNext application that connects ERPNext to bank accounts via the [SimpleFIN Bridge](https://beta-bridge.simplefin.org/info/developers). Each configured connection periodically retrieves posted bank transactions and imports them as `Bank Transaction` records in ERPNext, ready for reconciliation using ERPNext's standard Bank Reconciliation Tool.
+Sync via SimpleFIN is a Frappe/ERPNext application that connects ERPNext to bank accounts via the [SimpleFIN Bridge](https://beta-bridge.simplefin.org/info/developers). Each configured connection periodically retrieves posted bank transactions and imports them as `Bank Transaction` records in ERPNext, ready for reconciliation using ERPNext's standard Bank Reconciliation Tool.
 
 ### 1.1 Design Principles
 
@@ -33,7 +33,7 @@ Reference: [SimpleFIN Protocol v1.0.7](https://www.simplefin.org/protocol.html) 
 User obtains Setup Token from SimpleFIN Bridge website
          │
          ▼
-User pastes Setup Token into SimpleFIN Sync connection form
+User pastes Setup Token into Sync via SimpleFIN connection form
          │
          ▼
 App base64-decodes Setup Token → Claim URL
@@ -124,7 +124,7 @@ The app **must**:
 
 **Type:** Normal DocType
 **Naming:** `SFIN-{####}` (autoname)
-**Module:** SimpleFIN Sync
+**Module:** Sync via SimpleFIN
 
 | Field | Type | Options/Default | Required | Description |
 |---|---|---|---|---|
@@ -232,7 +232,7 @@ If a previously mapped `simplefin_account_id` disappears and a new unknown `id` 
 
 **Type:** Normal DocType
 **Naming:** `SFIN-LOG-{connection_name}-{timestamp}` or autoname
-**Module:** SimpleFIN Sync
+**Module:** Sync via SimpleFIN
 
 | Field | Type | Options | Required | Description |
 |---|---|---|---|---|
@@ -277,7 +277,7 @@ If a previously mapped `simplefin_account_id` disappears and a new unknown `id` 
 ### 3.5 SimpleFIN Sync Settings (Single DocType)
 
 **Type:** Single DocType
-**Module:** SimpleFIN Sync
+**Module:** Sync via SimpleFIN
 
 | Field | Type | Options/Default | Required | Description |
 |---|---|---|---|---|
@@ -1219,7 +1219,7 @@ sync_simplefin/
 
 ```python
 app_name = "sync_simplefin"
-app_title = "SimpleFIN Sync"
+app_title = "Sync via SimpleFIN"
 app_publisher = "Steve Bourg"
 app_description = "Bank transaction sync via SimpleFIN Bridge for ERPNext"
 app_version = "1.0.0"
@@ -1329,7 +1329,7 @@ All methods:
 ### 13.2 Metadata
 
 ```
-App Title: SimpleFIN Sync
+App Title: Sync via SimpleFIN
 Tagline: Automatic bank transaction import via SimpleFIN Bridge
 Category: Integrations
 ```
