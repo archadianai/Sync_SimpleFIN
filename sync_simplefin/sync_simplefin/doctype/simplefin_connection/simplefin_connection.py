@@ -187,7 +187,7 @@ def reregister(connection: str, setup_token: str) -> None:
 	Preserves all existing settings, mappings, and sync history.
 	Only replaces the access_url credential.
 	"""
-	from simplefin_sync.utils.simplefin_client import (
+	from sync_simplefin.utils.simplefin_client import (
 		SimpleFINAuthError,
 		SimpleFINClient,
 		SimpleFINError,
@@ -222,7 +222,7 @@ def reregister(connection: str, setup_token: str) -> None:
 @frappe.whitelist()
 def register_token(connection: str) -> None:
 	"""Exchange the setup token for an access URL and store it encrypted."""
-	from simplefin_sync.utils.simplefin_client import (
+	from sync_simplefin.utils.simplefin_client import (
 		SimpleFINAuthError,
 		SimpleFINClient,
 		SimpleFINError,
@@ -265,7 +265,7 @@ def register_token(connection: str) -> None:
 @frappe.whitelist()
 def test_connection(connection: str) -> str:
 	"""Test the connection by fetching balances only. Returns formatted HTML."""
-	from simplefin_sync.utils.simplefin_client import SimpleFINClient, SimpleFINError
+	from sync_simplefin.utils.simplefin_client import SimpleFINClient, SimpleFINError
 
 	conn = frappe.get_doc("SimpleFIN Connection", connection)
 
@@ -322,11 +322,11 @@ def sync_now(connection: str) -> None:
 	conn.save(ignore_permissions=True)
 
 	frappe.enqueue(
-		"simplefin_sync.utils.sync.run_sync",
+		"sync_simplefin.utils.sync.run_sync",
 		connection=conn.name,
 		queue="long",
 		deduplicate=True,
-		job_id=f"simplefin_sync_{conn.name}",
+		job_id=f"sync_simplefin_{conn.name}",
 		timeout=600,
 	)
 	frappe.db.commit()
@@ -352,11 +352,11 @@ def sync_full(connection: str) -> None:
 	conn.save(ignore_permissions=True)
 
 	frappe.enqueue(
-		"simplefin_sync.utils.sync.run_sync",
+		"sync_simplefin.utils.sync.run_sync",
 		connection=conn.name,
 		queue="long",
 		deduplicate=True,
-		job_id=f"simplefin_sync_{conn.name}",
+		job_id=f"sync_simplefin_{conn.name}",
 		timeout=600,
 	)
 	frappe.db.commit()
@@ -390,7 +390,7 @@ def wizard_register(connection_name: str, setup_token: str) -> dict:
 	Returns:
 		dict with ``connection`` (name), ``org`` info, and ``accounts`` list.
 	"""
-	from simplefin_sync.utils.simplefin_client import (
+	from sync_simplefin.utils.simplefin_client import (
 		SimpleFINAuthError,
 		SimpleFINClient,
 		SimpleFINError,

@@ -1,8 +1,8 @@
-# CLAUDE.md — SimpleFIN Sync for ERPNext
+# CLAUDE.md — Sync via SimpleFIN for ERPNext
 
 ## Project Overview
 
-You are building a Frappe/ERPNext application called **SimpleFIN Sync** that imports bank transactions from the SimpleFIN Bridge into ERPNext's Bank Transaction doctype for reconciliation.
+You are building a Frappe/ERPNext application called **Sync via SimpleFIN** that imports bank transactions from the SimpleFIN Bridge into ERPNext's Bank Transaction doctype for reconciliation.
 
 **Read `v1.0/simplefin_sync_spec.md` first.** It is the authoritative specification. This file tells you how to work; the spec tells you what to build.
 
@@ -20,10 +20,10 @@ You are building a Frappe/ERPNext application called **SimpleFIN Sync** that imp
 This is a standard Frappe app. Scaffold with:
 ```bash
 cd ~/frappe-bench
-bench new-app simplefin_sync
+bench new-app sync_simplefin
 ```
 
-The app lives at `~/frappe-bench/apps/simplefin_sync/`. All paths below are relative to the app root.
+The app lives at `~/frappe-bench/apps/sync_simplefin/`. All paths below are relative to the app root.
 
 ## Critical Conventions
 
@@ -79,7 +79,7 @@ Every `.py` and `.js` file must start with:
 ### Testing
 - Test files go in each doctype directory: `test_simplefin_connection.py`, etc.
 - Use `frappe.tests.utils.FrappeTestCase` as the base class.
-- Run tests with: `bench run-tests --app simplefin_sync`
+- Run tests with: `bench run-tests --app sync_simplefin`
 - Mock external HTTP calls — never hit the real SimpleFIN API in tests.
 - Use `unittest.mock.patch` for mocking `requests.get` and `requests.post`.
 
@@ -91,11 +91,11 @@ Follow this order strictly. Complete and verify each phase before starting the n
 
 1. **Scaffold the app** (if not already done):
    ```bash
-   bench new-app simplefin_sync
-   bench --site your-site.local install-app simplefin_sync
+   bench new-app sync_simplefin
+   bench --site your-site.local install-app sync_simplefin
    ```
 
-2. **Create the module:** Ensure `simplefin_sync/simplefin_sync/` directory exists with `__init__.py`.
+2. **Create the module:** Ensure `sync_simplefin/sync_simplefin/` directory exists with `__init__.py`.
 
 3. **Create DocTypes in this order** (dependencies flow downward):
    - `SimpleFIN Sync Settings` (Single DocType — no dependencies)
@@ -124,7 +124,7 @@ Follow this order strictly. Complete and verify each phase before starting the n
 3. **Create the database index** on `(simplefin_account_id, simplefin_transaction_id)`.
 
 4. **Verify Phase 2:**
-   - `bench --site your-site.local reinstall-app simplefin_sync` (or uninstall/install cycle).
+   - `bench --site your-site.local reinstall-app sync_simplefin` (or uninstall/install cycle).
    - Custom fields appear on the Bank Transaction form.
    - `simplefin_last_seen`, `simplefin_transaction_id`, etc. are all present.
    - After uninstall, custom fields are removed cleanly.
@@ -149,7 +149,7 @@ Follow this order strictly. Complete and verify each phase before starting the n
    - Non-HTTPS URL rejection.
 
 3. **Verify Phase 3:**
-   - All unit tests pass: `bench run-tests --app simplefin_sync --module simplefin_sync.utils.test_simplefin_client`
+   - All unit tests pass: `bench run-tests --app sync_simplefin --module sync_simplefin.utils.test_simplefin_client`
 
 ### Phase 4: Token Exchange Flow
 
@@ -265,7 +265,7 @@ Follow this order strictly. Complete and verify each phase before starting the n
 
 ### Phase 8: Testing and Documentation
 
-1. **Run full test suite:** `bench run-tests --app simplefin_sync`
+1. **Run full test suite:** `bench run-tests --app sync_simplefin`
 2. **Write README.md** with installation instructions, configuration guide, screenshots placeholder.
    - Include the manual recovery procedure for accidentally cancelled transactions (delete + re-sync).
 3. **Verify all file headers** have the copyright/attribution notice.
@@ -321,11 +321,11 @@ access_url = doc.get_password("access_url")
 
 # Enqueuing a background job
 frappe.enqueue(
-    "simplefin_sync.utils.sync.run_sync",
+    "sync_simplefin.utils.sync.run_sync",
     connection=connection_name,
     queue="long",
     deduplicate=True,
-    job_id=f"simplefin_sync_{connection_name}",
+    job_id=f"sync_simplefin_{connection_name}",
     timeout=600,  # 10 minutes max
 )
 
@@ -372,23 +372,23 @@ frappe.publish_realtime(
 ## Reference: hooks.py Complete Template
 
 ```python
-app_name = "simplefin_sync"
-app_title = "SimpleFIN Sync"
+app_name = "sync_simplefin"
+app_title = "Sync via SimpleFIN"
 app_publisher = "Steve Bourg"
 app_description = "Bank transaction sync via SimpleFIN Bridge for ERPNext"
 app_version = "1.0.0"
 app_license = "GPL-3.0"
 required_apps = ["frappe", "erpnext"]
 
-after_install = "simplefin_sync.install.after_install"
-after_uninstall = "simplefin_sync.install.after_uninstall"
+after_install = "sync_simplefin.install.after_install"
+after_uninstall = "sync_simplefin.install.after_uninstall"
 
 scheduler_events = {
     "all": [
-        "simplefin_sync.tasks.check_due_syncs"
+        "sync_simplefin.tasks.check_due_syncs"
     ],
     "daily": [
-        "simplefin_sync.tasks.cleanup_old_sync_logs"
+        "sync_simplefin.tasks.cleanup_old_sync_logs"
     ]
 }
 
@@ -398,7 +398,7 @@ ignore_links_on_delete = ["SimpleFIN Sync Log", "Bank Transaction"]
 
 doc_events = {
     "Bank Transaction": {
-        "on_trash": "simplefin_sync.utils.sync.on_bank_transaction_trash"
+        "on_trash": "sync_simplefin.utils.sync.on_bank_transaction_trash"
     }
 }
 ```

@@ -15,7 +15,7 @@ from unittest.mock import MagicMock, patch
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from simplefin_sync.utils.simplefin_client import (
+from sync_simplefin.utils.simplefin_client import (
 	SimpleFINAuthError,
 	SimpleFINClient,
 	SimpleFINError,
@@ -85,7 +85,7 @@ def _mock_response(status_code: int, text: str = "", json_data=None):
 class TestClaimAccessURL(FrappeTestCase):
 	"""Tests for SimpleFINClient.claim_access_url()."""
 
-	@patch("simplefin_sync.utils.simplefin_client.requests.post")
+	@patch("sync_simplefin.utils.simplefin_client.requests.post")
 	def test_successful_exchange(self, mock_post):
 		"""200 response with a valid access URL."""
 		mock_post.return_value = _mock_response(200, text=DEMO_ACCESS_URL)
@@ -98,7 +98,7 @@ class TestClaimAccessURL(FrappeTestCase):
 		self.assertEqual(call_args[0][0], DEMO_CLAIM_URL)
 		self.assertTrue(call_args[1]["verify"])
 
-	@patch("simplefin_sync.utils.simplefin_client.requests.post")
+	@patch("sync_simplefin.utils.simplefin_client.requests.post")
 	def test_403_already_claimed(self, mock_post):
 		"""403 means token was already used or is compromised."""
 		mock_post.return_value = _mock_response(403, text="Forbidden")
@@ -106,7 +106,7 @@ class TestClaimAccessURL(FrappeTestCase):
 		with self.assertRaises(SimpleFINAuthError):
 			SimpleFINClient.claim_access_url(DEMO_SETUP_TOKEN)
 
-	@patch("simplefin_sync.utils.simplefin_client.requests.post")
+	@patch("sync_simplefin.utils.simplefin_client.requests.post")
 	def test_500_server_error(self, mock_post):
 		"""Unexpected HTTP status raises SimpleFINHTTPError."""
 		mock_post.return_value = _mock_response(500, text="Internal Server Error")
@@ -115,7 +115,7 @@ class TestClaimAccessURL(FrappeTestCase):
 			SimpleFINClient.claim_access_url(DEMO_SETUP_TOKEN)
 		self.assertEqual(ctx.exception.status_code, 500)
 
-	@patch("simplefin_sync.utils.simplefin_client.requests.post")
+	@patch("sync_simplefin.utils.simplefin_client.requests.post")
 	def test_network_timeout(self, mock_post):
 		"""Timeout raises SimpleFINNetworkError."""
 		import requests as _req
@@ -125,7 +125,7 @@ class TestClaimAccessURL(FrappeTestCase):
 		with self.assertRaises(SimpleFINNetworkError):
 			SimpleFINClient.claim_access_url(DEMO_SETUP_TOKEN)
 
-	@patch("simplefin_sync.utils.simplefin_client.requests.post")
+	@patch("sync_simplefin.utils.simplefin_client.requests.post")
 	def test_connection_error(self, mock_post):
 		"""Connection failure raises SimpleFINNetworkError."""
 		import requests as _req
@@ -148,7 +148,7 @@ class TestClaimAccessURL(FrappeTestCase):
 		with self.assertRaises(SimpleFINError):
 			SimpleFINClient.claim_access_url("not-valid-base64!!!")
 
-	@patch("simplefin_sync.utils.simplefin_client.requests.post")
+	@patch("sync_simplefin.utils.simplefin_client.requests.post")
 	def test_empty_response_body(self, mock_post):
 		"""200 but empty body raises SimpleFINError."""
 		mock_post.return_value = _mock_response(200, text="")
@@ -156,7 +156,7 @@ class TestClaimAccessURL(FrappeTestCase):
 		with self.assertRaises(SimpleFINError):
 			SimpleFINClient.claim_access_url(DEMO_SETUP_TOKEN)
 
-	@patch("simplefin_sync.utils.simplefin_client.requests.post")
+	@patch("sync_simplefin.utils.simplefin_client.requests.post")
 	def test_non_https_access_url_rejected(self, mock_post):
 		"""200 but returned access URL is HTTP — rejected."""
 		mock_post.return_value = _mock_response(
@@ -210,7 +210,7 @@ class TestGetAccounts(FrappeTestCase):
 		super().setUp()
 		self.client = SimpleFINClient(DEMO_ACCESS_URL)
 
-	@patch("simplefin_sync.utils.simplefin_client.requests.get")
+	@patch("sync_simplefin.utils.simplefin_client.requests.get")
 	def test_successful_fetch(self, mock_get):
 		"""200 with valid JSON returns parsed data."""
 		mock_get.return_value = _mock_response(200, json_data=DEMO_ACCOUNTS_RESPONSE)
@@ -226,7 +226,7 @@ class TestGetAccounts(FrappeTestCase):
 		self.assertEqual(call_kwargs["auth"], ("demouser", "demopass"))
 		self.assertTrue(call_kwargs["verify"])
 
-	@patch("simplefin_sync.utils.simplefin_client.requests.get")
+	@patch("sync_simplefin.utils.simplefin_client.requests.get")
 	def test_balances_only(self, mock_get):
 		"""balances-only param is sent correctly."""
 		mock_get.return_value = _mock_response(200, json_data={"errors": [], "accounts": []})
@@ -237,7 +237,7 @@ class TestGetAccounts(FrappeTestCase):
 		params = dict(call_args[1]["params"])
 		self.assertEqual(params["balances-only"], "1")
 
-	@patch("simplefin_sync.utils.simplefin_client.requests.get")
+	@patch("sync_simplefin.utils.simplefin_client.requests.get")
 	def test_account_ids_filter(self, mock_get):
 		"""account IDs are sent as repeated query params."""
 		mock_get.return_value = _mock_response(200, json_data={"errors": [], "accounts": []})
@@ -250,7 +250,7 @@ class TestGetAccounts(FrappeTestCase):
 		account_params = [v for k, v in params if k == "account"]
 		self.assertEqual(account_params, ["ACT-001", "ACT-002"])
 
-	@patch("simplefin_sync.utils.simplefin_client.requests.get")
+	@patch("sync_simplefin.utils.simplefin_client.requests.get")
 	def test_403_revoked(self, mock_get):
 		"""403 raises SimpleFINAuthError."""
 		mock_get.return_value = _mock_response(403)
@@ -258,7 +258,7 @@ class TestGetAccounts(FrappeTestCase):
 		with self.assertRaises(SimpleFINAuthError):
 			self.client.get_accounts()
 
-	@patch("simplefin_sync.utils.simplefin_client.requests.get")
+	@patch("sync_simplefin.utils.simplefin_client.requests.get")
 	def test_402_payment_required(self, mock_get):
 		"""402 raises SimpleFINPaymentRequired."""
 		mock_get.return_value = _mock_response(402)
@@ -266,7 +266,7 @@ class TestGetAccounts(FrappeTestCase):
 		with self.assertRaises(SimpleFINPaymentRequired):
 			self.client.get_accounts()
 
-	@patch("simplefin_sync.utils.simplefin_client.requests.get")
+	@patch("sync_simplefin.utils.simplefin_client.requests.get")
 	def test_network_timeout(self, mock_get):
 		"""Timeout raises SimpleFINNetworkError."""
 		import requests as _req
@@ -276,7 +276,7 @@ class TestGetAccounts(FrappeTestCase):
 		with self.assertRaises(SimpleFINNetworkError):
 			self.client.get_accounts()
 
-	@patch("simplefin_sync.utils.simplefin_client.requests.get")
+	@patch("sync_simplefin.utils.simplefin_client.requests.get")
 	def test_connection_error(self, mock_get):
 		"""Connection failure raises SimpleFINNetworkError."""
 		import requests as _req
@@ -286,7 +286,7 @@ class TestGetAccounts(FrappeTestCase):
 		with self.assertRaises(SimpleFINNetworkError):
 			self.client.get_accounts()
 
-	@patch("simplefin_sync.utils.simplefin_client.requests.get")
+	@patch("sync_simplefin.utils.simplefin_client.requests.get")
 	def test_invalid_json_response(self, mock_get):
 		"""200 but non-JSON body raises SimpleFINError."""
 		mock_get.return_value = _mock_response(200, text="not json")
@@ -294,7 +294,7 @@ class TestGetAccounts(FrappeTestCase):
 		with self.assertRaises(SimpleFINError):
 			self.client.get_accounts()
 
-	@patch("simplefin_sync.utils.simplefin_client.requests.get")
+	@patch("sync_simplefin.utils.simplefin_client.requests.get")
 	def test_500_server_error(self, mock_get):
 		"""500 raises SimpleFINHTTPError."""
 		mock_get.return_value = _mock_response(500, text="Internal Server Error")
@@ -303,7 +303,7 @@ class TestGetAccounts(FrappeTestCase):
 			self.client.get_accounts()
 		self.assertEqual(ctx.exception.status_code, 500)
 
-	@patch("simplefin_sync.utils.simplefin_client.requests.get")
+	@patch("sync_simplefin.utils.simplefin_client.requests.get")
 	def test_pending_param(self, mock_get):
 		"""pending=1 is sent when include_pending is True."""
 		mock_get.return_value = _mock_response(200, json_data={"errors": [], "accounts": []})
@@ -322,7 +322,7 @@ class TestGetAccounts(FrappeTestCase):
 class TestTestConnection(FrappeTestCase):
 	"""Tests for SimpleFINClient.test_connection()."""
 
-	@patch("simplefin_sync.utils.simplefin_client.requests.get")
+	@patch("sync_simplefin.utils.simplefin_client.requests.get")
 	def test_delegates_to_get_accounts(self, mock_get):
 		"""test_connection calls get_accounts with balances_only=True."""
 		mock_get.return_value = _mock_response(200, json_data={"errors": [], "accounts": []})

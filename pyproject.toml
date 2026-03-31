@@ -1,5 +1,5 @@
 [project]
-name = "simplefin_sync"
+name = "sync_simplefin"
 authors = [
     { name = "Steve Bourg", email = "steve@bourg.com"}
 ]

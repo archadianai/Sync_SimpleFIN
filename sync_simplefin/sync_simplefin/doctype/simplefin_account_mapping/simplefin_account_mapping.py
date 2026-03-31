@@ -2,7 +2,7 @@
 # Code developed with assistance from Claude Opus/Sonnet 4.6 (Anthropic)
 # License: GPL-3.0
 
-from simplefin_sync.utils.enrichment import validate_custom_regex
+from sync_simplefin.utils.enrichment import validate_custom_regex
 
 from frappe import _
 from frappe.model.document import Document

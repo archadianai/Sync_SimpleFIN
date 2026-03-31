@@ -18,14 +18,14 @@ import frappe
 from frappe import _
 from frappe.utils import now_datetime
 
-from simplefin_sync.utils.enrichment import enrich_transaction
-from simplefin_sync.utils.notifications import (
+from sync_simplefin.utils.enrichment import enrich_transaction
+from sync_simplefin.utils.notifications import (
 	notify_connection_revoked,
 	notify_empty_account,
 	notify_record_mismatch,
 	notify_sync_failure,
 )
-from simplefin_sync.utils.simplefin_client import (
+from sync_simplefin.utils.simplefin_client import (
 	SimpleFINAuthError,
 	SimpleFINClient,
 	SimpleFINError,

@@ -1,6 +1,6 @@
-# SimpleFIN Sync — Technical Specification
+# Sync via SimpleFIN — Technical Specification
 
-**App Name:** SimpleFIN Sync
+**App Name:** Sync via SimpleFIN
 **Version:** 1.0.0
 **Authors:** Steve Bourg and Claude Opus/Sonnet 4.6
 **License:** GPL-3.0 (compatible with ERPNext codebase for future absorption)
@@ -836,10 +836,10 @@ def extract_party_name(description: str) -> str | None:
 ```python
 scheduler_events = {
     "all": [
-        "simplefin_sync.tasks.check_due_syncs"
+        "sync_simplefin.tasks.check_due_syncs"
     ],
     "daily": [
-        "simplefin_sync.tasks.cleanup_old_sync_logs"
+        "sync_simplefin.tasks.cleanup_old_sync_logs"
     ]
 }
 ```
@@ -967,7 +967,7 @@ def enqueue_sync(conn, reset_retries):
         {"sync_state": "Queued"})
 
     frappe.enqueue(
-        "simplefin_sync.utils.sync.run_sync",
+        "sync_simplefin.utils.sync.run_sync",
         connection=conn.name,
         queue="long",
         deduplicate=True  # Frappe's built-in job dedup by method+args
@@ -1168,12 +1168,12 @@ Use Frappe's built-in notification system (`frappe.sendmail`, `frappe.publish_re
 ## 10. App Structure
 
 ```
-simplefin_sync/
-├── simplefin_sync/
+sync_simplefin/
+├── sync_simplefin/
 │   ├── __init__.py
 │   ├── hooks.py
 │   ├── patches/                          # Data migration patches
-│   ├── simplefin_sync/
+│   ├── sync_simplefin/
 │   │   ├── doctype/
 │   │   │   ├── simplefin_connection/
 │   │   │   │   ├── simplefin_connection.py
@@ -1183,19 +1183,19 @@ simplefin_sync/
 │   │   │   ├── simplefin_account_mapping/
 │   │   │   │   ├── simplefin_account_mapping.py
 │   │   │   │   └── simplefin_account_mapping.json
-│   │   │   ├── simplefin_sync_log/
-│   │   │   │   ├── simplefin_sync_log.py
-│   │   │   │   ├── simplefin_sync_log.js
-│   │   │   │   └── simplefin_sync_log.json
+│   │   │   ├── sync_simplefin_log/
+│   │   │   │   ├── sync_simplefin_log.py
+│   │   │   │   ├── sync_simplefin_log.js
+│   │   │   │   └── sync_simplefin_log.json
 │   │   │   ├── simplefin_balance_snapshot/
 │   │   │   │   ├── simplefin_balance_snapshot.py
 │   │   │   │   └── simplefin_balance_snapshot.json
-│   │   │   └── simplefin_sync_settings/
-│   │   │       ├── simplefin_sync_settings.py
-│   │   │       └── simplefin_sync_settings.json
+│   │   │   └── sync_simplefin_settings/
+│   │   │       ├── sync_simplefin_settings.py
+│   │   │       └── sync_simplefin_settings.json
 │   │   └── workspace/
-│   │       └── simplefin_sync/
-│   │           └── simplefin_sync.json     # Workspace with shortcuts
+│   │       └── sync_simplefin/
+│   │           └── sync_simplefin.json     # Workspace with shortcuts
 │   ├── api/
 │   │   ├── __init__.py
 │   │   └── simplefin.py                   # Whitelisted API methods
@@ -1218,7 +1218,7 @@ simplefin_sync/
 ### 10.1 hooks.py Key Entries
 
 ```python
-app_name = "simplefin_sync"
+app_name = "sync_simplefin"
 app_title = "SimpleFIN Sync"
 app_publisher = "Steve Bourg"
 app_description = "Bank transaction sync via SimpleFIN Bridge for ERPNext"
@@ -1227,23 +1227,23 @@ app_license = "GPL-3.0"
 required_apps = ["frappe", "erpnext"]
 
 # Custom fields injected into Bank Transaction
-after_install = "simplefin_sync.install.after_install"
-after_uninstall = "simplefin_sync.install.after_uninstall"
+after_install = "sync_simplefin.install.after_install"
+after_uninstall = "sync_simplefin.install.after_uninstall"
 
 # Scheduled tasks
 scheduler_events = {
     "all": [
-        "simplefin_sync.tasks.check_due_syncs"
+        "sync_simplefin.tasks.check_due_syncs"
     ],
     "daily": [
-        "simplefin_sync.tasks.cleanup_old_sync_logs"
+        "sync_simplefin.tasks.cleanup_old_sync_logs"
     ]
 }
 
 # Document events (optional — for cleanup on Bank Transaction delete)
 doc_events = {
     "Bank Transaction": {
-        "on_trash": "simplefin_sync.utils.sync.on_bank_transaction_trash"
+        "on_trash": "sync_simplefin.utils.sync.on_bank_transaction_trash"
     }
 }
 ```
@@ -1258,7 +1258,7 @@ On uninstall, removes custom fields cleanly.
 
 ## 11. SimpleFIN Client Module
 
-`simplefin_sync/utils/simplefin_client.py`
+`sync_simplefin/utils/simplefin_client.py`
 
 ```python
 class SimpleFINClient:
@@ -1339,7 +1339,7 @@ Category: Integrations
 ## 14. Implementation Phases
 
 ### Phase 1: Foundation
-- [ ] Scaffold Frappe app (`bench new-app simplefin_sync`)
+- [ ] Scaffold Frappe app (`bench new-app sync_simplefin`)
 - [ ] Create all DocTypes (Connection, Account Mapping, Sync Log, Balance Snapshot, Settings)
 - [ ] Create custom fields on Bank Transaction
 - [ ] Implement SimpleFIN client module
@@ -1408,7 +1408,7 @@ The following deviations and additions were discovered during v1.0 implementatio
 | Spec Reference | Issue | Resolution |
 |---|---|---|
 | `frappe.get_logger(__name__)` | Removed in Frappe v16 | Use `frappe.logger(__name__)` |
-| `frappe.enqueue(..., deduplicate=True)` | Requires `job_id` parameter in v16 | Added `job_id=f"simplefin_sync_{conn.name}"` |
+| `frappe.enqueue(..., deduplicate=True)` | Requires `job_id` parameter in v16 | Added `job_id=f"sync_simplefin_{conn.name}"` |
 | Datetime fields | MariaDB rejects timezone-aware strings (`+00:00`) | All Datetime values use naive UTC: `datetime.utcfromtimestamp()` |
 | Python version | Spec said 3.11+ | Frappe v16 requires **Python 3.14+** (bench image ships 3.14.2) |
 | Node version | Not specified | Frappe v16 requires **Node.js 24+** (bench image ships 24.13.0) |

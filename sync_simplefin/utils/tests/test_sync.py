@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from simplefin_sync.utils.sync import (
+from sync_simplefin.utils.sync import (
 	_contains_rate_limit_warning,
 	_unix_to_date,
 	build_chunks,

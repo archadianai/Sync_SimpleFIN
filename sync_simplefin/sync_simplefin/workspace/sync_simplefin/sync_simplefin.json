@@ -1,7 +1,7 @@
 {
- "app": "simplefin_sync",
+ "app": "sync_simplefin",
  "charts": [],
- "content": "[{\"id\":\"sf_header\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>SimpleFIN Sync</b></span>\",\"col\":12}},{\"id\":\"sf_spacer\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"sf_card_main\",\"type\":\"card\",\"data\":{\"card_name\":\"Bank Sync\",\"col\":4}},{\"id\":\"sf_card_config\",\"type\":\"card\",\"data\":{\"card_name\":\"Configuration\",\"col\":4}},{\"id\":\"sf_card_tools\",\"type\":\"card\",\"data\":{\"card_name\":\"Tools\",\"col\":4}}]",
+ "content": "[{\"id\":\"sf_header\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Sync via SimpleFIN</b></span>\",\"col\":12}},{\"id\":\"sf_spacer\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"sf_card_main\",\"type\":\"card\",\"data\":{\"card_name\":\"Bank Sync\",\"col\":4}},{\"id\":\"sf_card_config\",\"type\":\"card\",\"data\":{\"card_name\":\"Configuration\",\"col\":4}},{\"id\":\"sf_card_tools\",\"type\":\"card\",\"data\":{\"card_name\":\"Tools\",\"col\":4}}]",
  "creation": "2026-03-23 20:10:32.497738",
  "custom_blocks": [],
  "docstatus": 0,
@@ -12,7 +12,7 @@
  "idx": 0,
  "indicator_color": "green",
  "is_hidden": 0,
- "label": "SimpleFIN Sync",
+ "label": "Sync via SimpleFIN",
  "link_type": "DocType",
  "links": [
   {
@@ -89,8 +89,8 @@
  ],
  "modified": "2026-03-23 20:10:32.497738",
  "modified_by": "Administrator",
- "module": "SimpleFIN Sync",
- "name": "SimpleFIN Sync",
+ "module": "Sync via SimpleFIN",
+ "name": "Sync via SimpleFIN",
  "number_cards": [],
  "owner": "Administrator",
  "parent_page": "",
@@ -100,6 +100,6 @@
  "roles": [],
  "sequence_id": 30.0,
  "shortcuts": [],
- "title": "SimpleFIN Sync",
+ "title": "Sync via SimpleFIN",
  "type": "Workspace"
 }

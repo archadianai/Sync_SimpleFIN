@@ -12,7 +12,7 @@ from unittest.mock import patch
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from simplefin_sync.tasks import (
+from sync_simplefin.tasks import (
 	_evaluate_connection,
 	_parse_time,
 	is_regular_interval_due,
@@ -203,7 +203,7 @@ class TestIsRegularIntervalDue(FrappeTestCase):
 class TestEvaluateConnection(FrappeTestCase):
 	"""Tests for _evaluate_connection() state transitions."""
 
-	@patch("simplefin_sync.tasks._enqueue_sync")
+	@patch("sync_simplefin.tasks._enqueue_sync")
 	def test_rate_limited_connection_skipped(self, mock_enqueue):
 		"""Active rate limit pause → skip entirely."""
 		now = datetime(2026, 3, 24, 12, 0)
@@ -215,8 +215,8 @@ class TestEvaluateConnection(FrappeTestCase):
 		_evaluate_connection(conn, now)
 		mock_enqueue.assert_not_called()
 
-	@patch("simplefin_sync.tasks.frappe")
-	@patch("simplefin_sync.tasks._enqueue_sync")
+	@patch("sync_simplefin.tasks.frappe")
+	@patch("sync_simplefin.tasks._enqueue_sync")
 	def test_expired_rate_limit_cleared(self, mock_enqueue, mock_frappe):
 		"""Expired rate limit pause → clear and proceed."""
 		now = datetime(2026, 3, 25, 2, 0)
@@ -234,8 +234,8 @@ class TestEvaluateConnection(FrappeTestCase):
 			{"rate_limit_paused_until": None},
 		)
 
-	@patch("simplefin_sync.tasks.frappe")
-	@patch("simplefin_sync.tasks._enqueue_sync")
+	@patch("sync_simplefin.tasks.frappe")
+	@patch("sync_simplefin.tasks._enqueue_sync")
 	def test_stale_syncing_state_recovered(self, mock_enqueue, mock_frappe):
 		"""Syncing for >30 min → recovered to Failed."""
 		now = datetime(2026, 3, 24, 14, 0)
@@ -249,7 +249,7 @@ class TestEvaluateConnection(FrappeTestCase):
 		call_args = mock_frappe.db.set_value.call_args
 		self.assertEqual(call_args[0][2]["sync_state"], "Failed")
 
-	@patch("simplefin_sync.tasks._enqueue_sync")
+	@patch("sync_simplefin.tasks._enqueue_sync")
 	def test_syncing_state_not_stale_skipped(self, mock_enqueue):
 		"""Syncing for <30 min → skip (job still running)."""
 		now = datetime(2026, 3, 24, 14, 0)
@@ -261,7 +261,7 @@ class TestEvaluateConnection(FrappeTestCase):
 		_evaluate_connection(conn, now)
 		mock_enqueue.assert_not_called()
 
-	@patch("simplefin_sync.tasks._enqueue_sync")
+	@patch("sync_simplefin.tasks._enqueue_sync")
 	def test_retry_pending_fires_on_interval(self, mock_enqueue):
 		"""Retry Pending + retry interval elapsed → enqueue without reset."""
 		now = datetime(2026, 3, 24, 14, 0)
@@ -276,7 +276,7 @@ class TestEvaluateConnection(FrappeTestCase):
 		_evaluate_connection(conn, now)
 		mock_enqueue.assert_called_once_with(conn, reset_retries=False)
 
-	@patch("simplefin_sync.tasks._enqueue_sync")
+	@patch("sync_simplefin.tasks._enqueue_sync")
 	def test_retry_pending_regular_interval_takes_priority(self, mock_enqueue):
 		"""Retry Pending + regular interval due → enqueue WITH reset."""
 		# Daily sync at 02:00, last sync was yesterday, now it's 03:00
@@ -292,7 +292,7 @@ class TestEvaluateConnection(FrappeTestCase):
 		_evaluate_connection(conn, now)
 		mock_enqueue.assert_called_once_with(conn, reset_retries=True)
 
-	@patch("simplefin_sync.tasks._enqueue_sync")
+	@patch("sync_simplefin.tasks._enqueue_sync")
 	def test_idle_due_enqueues(self, mock_enqueue):
 		"""Idle + interval due → enqueue with reset."""
 		now = datetime(2026, 3, 24, 3, 0)
@@ -306,7 +306,7 @@ class TestEvaluateConnection(FrappeTestCase):
 		_evaluate_connection(conn, now)
 		mock_enqueue.assert_called_once_with(conn, reset_retries=True)
 
-	@patch("simplefin_sync.tasks._enqueue_sync")
+	@patch("sync_simplefin.tasks._enqueue_sync")
 	def test_idle_not_due_skipped(self, mock_enqueue):
 		"""Idle + not due → no action."""
 		now = datetime(2026, 3, 24, 1, 0)  # before sync_time
@@ -319,7 +319,7 @@ class TestEvaluateConnection(FrappeTestCase):
 		_evaluate_connection(conn, now)
 		mock_enqueue.assert_not_called()
 
-	@patch("simplefin_sync.tasks._enqueue_sync")
+	@patch("sync_simplefin.tasks._enqueue_sync")
 	def test_failed_state_waits_for_interval(self, mock_enqueue):
 		"""Failed + interval not due → no action."""
 		now = datetime(2026, 3, 24, 1, 0)
@@ -333,7 +333,7 @@ class TestEvaluateConnection(FrappeTestCase):
 		_evaluate_connection(conn, now)
 		mock_enqueue.assert_not_called()
 
-	@patch("simplefin_sync.tasks._enqueue_sync")
+	@patch("sync_simplefin.tasks._enqueue_sync")
 	def test_failed_state_resets_on_interval(self, mock_enqueue):
 		"""Failed + interval due → enqueue with reset."""
 		now = datetime(2026, 3, 24, 3, 0)

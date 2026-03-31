@@ -249,12 +249,12 @@ def _enqueue_sync(conn, reset_retries: bool) -> None:
 	frappe.db.set_value("SimpleFIN Connection", conn.name, update_fields)
 
 	frappe.enqueue(
-		"simplefin_sync.utils.sync.run_sync",
+		"sync_simplefin.utils.sync.run_sync",
 		connection=conn.name,
 		sync_type="Scheduled",
 		queue="long",
 		deduplicate=True,
-		job_id=f"simplefin_sync_{conn.name}",
+		job_id=f"sync_simplefin_{conn.name}",
 		timeout=600,
 	)
 	frappe.db.commit()

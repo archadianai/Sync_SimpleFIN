@@ -1,4 +1,4 @@
-# SimpleFIN Sync
+# Sync via SimpleFIN
 
 Automatic bank transaction import via [SimpleFIN Bridge](https://beta-bridge.simplefin.org/info/developers) for ERPNext.
 
@@ -29,7 +29,7 @@ SimpleFIN Sync connects ERPNext to your bank accounts through the SimpleFIN Brid
 ```bash
 cd $PATH_TO_YOUR_BENCH
 bench get-app https://github.com/archadianai/SimpleFIN_Sync.git
-bench --site your-site install-app simplefin_sync
+bench --site your-site install-app sync_simplefin
 ```
 
 The installer automatically creates custom fields on the Bank Transaction doctype and a database index for fast deduplication lookups.
@@ -44,7 +44,7 @@ The installer automatically creates custom fields on the Bank Transaction doctyp
 
 ### 2. Create a Connection
 
-1. In ERPNext, go to **SimpleFIN Sync** in the sidebar (or search for "SimpleFIN Connection")
+1. In ERPNext, go to **Sync via SimpleFIN** in the sidebar (or search for "SimpleFIN Connection")
 2. Click **New SimpleFIN Connection** — a setup wizard dialog appears
 3. **Step 1:** Enter a connection name (e.g., "BECU Business") and paste your Setup Token, then click **Register**
 4. **Step 2:** Your bank accounts appear grouped by institution. Set the **ERPNext Bank Account** for each account you want to sync, then click **Create Connection**
@@ -138,7 +138,7 @@ Note: Cancelled transactions (docstatus=2) are intentionally retained in the ded
 This app uses `pre-commit` for code formatting and linting:
 
 ```bash
-cd apps/simplefin_sync
+cd apps/sync_simplefin
 pre-commit install
 ```
 
@@ -147,7 +147,7 @@ Tools: ruff, eslint, prettier
 ### Running Tests
 
 ```bash
-bench --site your-site run-tests --app simplefin_sync
+bench --site your-site run-tests --app sync_simplefin
 ```
 
 All tests use mocked HTTP responses — no external API calls are made during testing.

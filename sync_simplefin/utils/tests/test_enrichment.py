@@ -9,7 +9,7 @@ import unittest
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from simplefin_sync.utils.enrichment import (
+from sync_simplefin.utils.enrichment import (
 	apply_custom_regex,
 	enrich_transaction,
 	extract_party_name,
