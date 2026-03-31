@@ -161,3 +161,7 @@ GPL-3.0
 - **Author:** Steve Bourg / [Archadian AI, LLC](https://github.com/archadianai)
 - **Development assistance:** Claude Opus/Sonnet 4.6 (Anthropic)
 - **SimpleFIN Bridge:** [simplefin.org](https://www.simplefin.org/)
+
+## Trademarks
+
+ERPNext is a registered trademark of Frappe Technologies Pvt Ltd. SimpleFIN is a trademark of SF Sync, LLC. This tool is not affiliated with or endorsed by either party.
