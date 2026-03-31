@@ -25,9 +25,9 @@ erpnext = ">=16.0.0,<17.0.0"
 # package_name = "~=1.1.0"
 
 [project.urls]
-Homepage = "https://github.com/archadianai/SimpleFIN_Sync"
-Repository = "https://github.com/archadianai/SimpleFIN_Sync.git"
-"Bug Reports" = "https://github.com/archadianai/SimpleFIN_Sync/issues"
+Homepage = "https://github.com/archadianai/Sync_SimpleFIN"
+Repository = "https://github.com/archadianai/Sync_SimpleFIN.git"
+"Bug Reports" = "https://github.com/archadianai/Sync_SimpleFIN/issues"
 
 [tool.ruff]
 line-length = 110

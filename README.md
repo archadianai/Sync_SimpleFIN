@@ -28,7 +28,7 @@ SimpleFIN Sync connects ERPNext to your bank accounts through the SimpleFIN Brid
 
 ```bash
 cd $PATH_TO_YOUR_BENCH
-bench get-app https://github.com/archadianai/SimpleFIN_Sync.git
+bench get-app https://github.com/archadianai/Sync_SimpleFIN.git
 bench --site your-site install-app sync_simplefin
 ```
 

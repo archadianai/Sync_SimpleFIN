@@ -13,7 +13,7 @@ You are building a Frappe/ERPNext application called **Sync via SimpleFIN** that
 - **Dev environment:** Ubuntu 24.04, ERPNext in Docker containers
 - **Production target:** Frappe Cloud (Hetzner)
 - **License:** GPL-3.0
-- **GitHub Repo:** SimpleFIN_Sync
+- **GitHub Repo:** Sync_SimpleFIN
 
 ## Project Structure
 
