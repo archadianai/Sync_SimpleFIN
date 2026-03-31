@@ -3,7 +3,7 @@
 // License: GPL-3.0
 
 const CONN_METHOD =
-	"sync_simplefin.sync_simplefin.doctype.simplefin_connection.simplefin_connection";
+	"sync_simplefin.sync_via_simplefin.doctype.simplefin_connection.simplefin_connection";
 
 frappe.ui.form.on("SimpleFIN Connection", {
 	refresh(frm) {
