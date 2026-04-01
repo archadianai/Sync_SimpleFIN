@@ -13,6 +13,9 @@ build/
 # Sensitive files
 setup_token
 
+# Full-size logo (only 200x200 version goes to repo)
+logo.png
+
 # IDE / Editor
 .vscode/
 .idea/
