@@ -13,8 +13,8 @@ build/
 # Sensitive files
 setup_token
 
-# Full-size logo (only 200x200 version goes to repo)
-logo.png
+# Marketplace submission assets (logos, screenshots, video)
+marketplace-assets/
 
 # IDE / Editor
 .vscode/
