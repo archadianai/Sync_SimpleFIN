@@ -1,0 +1,62 @@
+{
+ "app": "sync_simplefin",
+ "docstatus": 0,
+ "doctype": "Workspace Sidebar",
+ "header_icon": "bank",
+ "idx": 0,
+ "items": [
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "link",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "SimpleFIN Connection",
+   "link_to": "SimpleFIN Connection",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "file-text",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Sync Logs",
+   "link_to": "SimpleFIN Sync Log",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "settings",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Settings",
+   "link_to": "SimpleFIN Sync Settings",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "tool",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Bank Reconciliation Tool",
+   "link_to": "Bank Reconciliation Tool",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  }
+ ],
+ "module": "Sync via SimpleFIN",
+ "name": "Sync via SimpleFIN",
+ "owner": "Administrator",
+ "standard": 1,
+ "title": "Sync via SimpleFIN"
+}

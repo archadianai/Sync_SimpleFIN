@@ -1,0 +1,17 @@
+{
+ "app": "sync_simplefin",
+ "docstatus": 0,
+ "doctype": "Desktop Icon",
+ "hidden": 0,
+ "icon": "bank",
+ "icon_type": "Link",
+ "idx": 0,
+ "label": "Sync via SimpleFIN",
+ "link_to": "Sync via SimpleFIN",
+ "link_type": "Workspace Sidebar",
+ "name": "Sync via SimpleFIN",
+ "owner": "Administrator",
+ "restrict_removal": 0,
+ "roles": [],
+ "standard": 1
+}
