@@ -1,0 +1,52 @@
+name: Linters
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linters-${{ github.event.number || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  semgrep:
+    name: Semgrep Rules
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+
+      - name: Install Semgrep
+        run: pip install semgrep
+
+      - name: Download Frappe Semgrep rules
+        run: git clone --depth 1 https://github.com/frappe/semgrep-rules.git frappe-semgrep-rules
+
+      - name: Run Semgrep
+        run: semgrep ci --config ./frappe-semgrep-rules/rules --config r/python.lang.correctness
+
+  pre-commit:
+    name: Pre-commit Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+
+      - uses: pre-commit/action@v3.0.1
+        with:
+          extra_args: --all-files
