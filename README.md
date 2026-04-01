@@ -34,6 +34,8 @@ bench --site your-site install-app sync_simplefin
 
 The installer automatically creates custom fields on the Bank Transaction doctype and a database index for fast deduplication lookups.
 
+> **Note:** After installation, reload your browser (or select Reload from the sidebar dropdown) for "Sync via SimpleFIN" to appear in the left sidebar.
+
 ## Setup
 
 ### 1. Get a SimpleFIN Setup Token
