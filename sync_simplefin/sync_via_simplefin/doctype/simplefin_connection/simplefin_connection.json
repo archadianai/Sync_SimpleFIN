@@ -88,7 +88,6 @@
    "default": "0",
    "fieldname": "is_registered",
    "fieldtype": "Check",
-   "in_list_view": 1,
    "label": "Registered",
    "read_only": 1
   },
@@ -96,7 +95,6 @@
    "default": "0",
    "fieldname": "enabled",
    "fieldtype": "Check",
-   "in_list_view": 1,
    "label": "Enabled"
   },
   {

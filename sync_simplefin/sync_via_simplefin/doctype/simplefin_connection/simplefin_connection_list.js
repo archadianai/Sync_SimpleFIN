@@ -6,6 +6,9 @@ frappe.listview_settings["SimpleFIN Connection"] = {
 	// Show all connections by default (Frappe auto-hides disabled records)
 	filters: [["enabled", "like", "%"]],
 
+	// Hide SFIN-#### ID column — connection name is the meaningful identifier
+	hide_name_column: true,
+
 	get_indicator(doc) {
 		// Rate Limited (takes priority)
 		if (doc.rate_limit_paused_until) {
