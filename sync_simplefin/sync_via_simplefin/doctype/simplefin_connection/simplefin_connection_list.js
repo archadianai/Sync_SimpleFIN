@@ -9,6 +9,9 @@ frappe.listview_settings["SimpleFIN Connection"] = {
 	// Hide SFIN-#### ID column — connection name is the meaningful identifier
 	hide_name_column: true,
 
+	// Fetch fields needed by get_indicator (not in_list_view but used for status)
+	add_fields: ["is_registered", "enabled", "last_sync_status", "rate_limit_paused_until"],
+
 	get_indicator(doc) {
 		// Rate Limited (takes priority)
 		if (doc.rate_limit_paused_until) {
