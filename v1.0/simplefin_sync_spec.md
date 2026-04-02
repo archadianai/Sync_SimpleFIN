@@ -135,10 +135,7 @@ The app **must**:
 | `is_registered` | Check | 0 | No | Set to 1 after successful token exchange (read-only) |
 | `enabled` | Check | 0 | No | Cannot be enabled until `is_registered = 1` |
 | `registration_date` | Datetime | | No | When the token exchange succeeded (read-only) |
-| **Organization Info** | Section Break | | | *(Auto-populated from SimpleFIN on first successful sync)* |
-| `org_domain` | Data | | No | Institution domain from SimpleFIN `org.domain` |
-| `org_name` | Data | | No | Institution name from SimpleFIN `org.name` |
-| `org_url` | Data | | No | Institution URL from SimpleFIN `org.url` |
+| `simplefin_server` | Data | | No | Server hostname extracted from access URL (read-only) |
 | **Sync Schedule** | Section Break | | | |
 | `sync_frequency` | Select | Every 2 Hours/4x Daily/Twice Daily/Daily/Weekly/Bi-Weekly/Monthly | Yes | Default: Daily |
 | `sync_time` | Time | | No | Preferred time of day. Applies to Daily, Weekly, Bi-Weekly, and Monthly. Ignored for sub-daily frequencies (Every 2 Hours, 4x Daily, Twice Daily) where syncs are interval-based. Default: 02:00 (2 AM site timezone) |
@@ -146,22 +143,15 @@ The app **must**:
 | `sync_day_of_month` | Int | 1 | No | Which day of the month to sync (1–28). Applies to Monthly only. Capped at 28 to avoid end-of-month ambiguity. Default: 1 |
 | `retry_count` | Int | 3 | No | Number of retry attempts on failure |
 | `retry_interval_minutes` | Int | 30 | No | Minutes between retries |
-| `initial_history_days` | Int | 90 | No | Days of history to pull on first sync or re-enable. No artificial cap — requests are automatically split into ≤90-day chunks per SimpleFIN API limits. Actual data availability depends on the institution. |
+| `initial_history_days` | Int | 90 | No | Days of history to pull on first sync or re-enable. Requests are automatically split into ≤45-day chunks per SimpleFIN Bridge recommendations. Actual data availability depends on the institution. |
 | `rolling_window_days` | Int | 14 | No | Days of overlap on subsequent syncs to catch backdated txns |
 | **Pending Transactions** | Section Break | | | |
 | `include_pending` | Check | 0 | No | Whether to request pending transactions from SimpleFIN |
-| **Transaction Enrichment** | Section Break | | | |
-| `extract_reference_number` | Check | 1 | No | Extract reference/check numbers from transaction descriptions. Default: enabled. When enabled, uses custom regex if configured, otherwise uses built-in patterns (see Section 5.6). |
-| `custom_reference_regex` | Small Text | | No | Custom regex pattern for extracting reference numbers. Must contain one capture group. Example: `(?:REF|CONF)\s*#?\s*(\w+)`. Leave blank to use built-in patterns. |
-| `extract_party_name` | Check | 1 | No | Extract party/merchant names from transaction descriptions. Default: enabled. When enabled, uses custom regex if configured, otherwise uses built-in patterns (see Section 5.6). |
-| `custom_party_regex` | Small Text | | No | Custom regex pattern for extracting party names. Must contain one capture group that captures the party name portion. Example: `^ACH\s+\w+\s*[-:]\s*(.+)`. Leave blank to use built-in patterns. |
 | **Notification Settings** | Section Break | | | |
 | `on_sync_failure` | Select | Log Only/Email/System Notification | Yes | Default: System Notification |
 | `on_empty_account` | Select | Log Only/Email/System Notification | Yes | Default: Log Only |
 | `on_record_mismatch` | Select | Log Only/Email/System Notification | Yes | Default: System Notification |
 | `notification_recipients` | Small Text | | No | Comma-separated email addresses (used when Email is selected) |
-| **Timezone** | Section Break | | | |
-| `transaction_timezone` | Select | (all pytz timezones) | Yes | Timezone for converting UNIX epoch → ERPNext Date. Default: site timezone |
 | **Account Mappings** | Section Break | | | |
 | `account_mappings` | Table | SimpleFIN Account Mapping | No | Child table mapping SimpleFIN accounts → ERPNext Bank Accounts |
 | **Status (Read-Only)** | Section Break | | | |
@@ -169,6 +159,7 @@ The app **must**:
 | `last_sync_attempt` | Datetime | | No | Timestamp of last sync attempt |
 | `last_sync_status` | Select | Success/Failed/Never Synced | No | |
 | `last_successful_sync` | Datetime | | No | Timestamp of last successful sync |
+| `next_scheduled_sync` | Datetime | | No | Computed next sync time (read-only, calculated on save) |
 | `last_sync_end_date` | Int | | No | UNIX timestamp: the `end-date` from the last successful data pull |
 | `last_sync_error` | Small Text | | No | Last error message (if failed) |
 | `retry_attempts_used` | Int | 0 | No | How many retries have been consumed in the current retry cycle (read-only). Reset to 0 on successful sync or when a new regular interval begins. |
@@ -206,7 +197,12 @@ The app **must**:
 | `simplefin_org_name` | Data | | No | Institution name from SimpleFIN `org.name` (e.g., "BECU") |
 | `simplefin_currency` | Data | | No | Account currency from SimpleFIN (ISO 4217 or custom currency URL) |
 | `erpnext_bank_account` | Link | Bank Account | No | ERPNext Bank Account to import transactions into |
-| `is_active` | Check | 1 | No | Whether to sync this account (default: active) |
+| `is_active` | Check | 1 | No | Whether to sync this account (default: active, auto-set when bank account assigned) |
+| **Transaction Enrichment** | Section Break | | | *Per-account enrichment — different institutions may use different description formats* |
+| `extract_reference_number` | Check | 1 | No | Extract reference/check numbers from descriptions. Default: enabled. |
+| `custom_reference_regex` | Small Text | | No | Custom regex with one capture group. Leave blank for built-in patterns. |
+| `extract_party_name` | Check | 1 | No | Extract party/merchant names from descriptions. Default: enabled. |
+| `custom_party_regex` | Small Text | | No | Custom regex with one capture group. Leave blank for built-in patterns. |
 | `missing_from_simplefin` | Check | 0 | No | Set when a previously seen account stops appearing in SimpleFIN responses |
 | `first_seen` | Datetime | | No | When this account first appeared from SimpleFIN |
 | `last_seen` | Datetime | | No | When this account last appeared in a SimpleFIN response |
@@ -244,7 +240,7 @@ If a previously mapped `simplefin_account_id` disappears and a new unknown `id` 
 | `request_start_date` | Datetime | | No | Overall requested `start-date` (earliest chunk start) |
 | `request_end_date` | Datetime | | No | Overall requested `end-date` (latest chunk end) |
 | `actual_data_end_date` | Datetime | | No | End date of the last chunk that actually returned data |
-| `chunks_requested` | Int | | No | Total ≤90-day chunks planned (1 if no splitting) |
+| `chunks_requested` | Int | | No | Total ≤45-day chunks planned (1 if no splitting) |
 | `chunks_completed` | Int | | No | Chunks actually executed (may be less if rate-limited) |
 | `chunks_empty` | Int | | No | Chunks that returned zero transactions (institution history gap) |
 | `accounts_retrieved` | Int | | No | Number of SimpleFIN accounts in response |
@@ -329,7 +325,7 @@ If a previously mapped `simplefin_account_id` disappears and a new unknown `id` 
    b. If no last_sync_end_date (first sync or re-enable):
       start_date = now - initial_history_days
    c. end_date = now
-   d. If (end_date - start_date) > 90 days: split into ≤90-day chunks (see Section 5.4)
+   d. If (end_date - start_date) > 45 days: split into ≤45-day chunks (see Section 5.4)
 4. For each chunk (or single range if no splitting needed):
    a. Build request URL:
       {access_url_base}/accounts?start-date={chunk_start_ts}&end-date={chunk_end_ts}
@@ -383,7 +379,7 @@ Map SimpleFIN fields to ERPNext `Bank Transaction` fields:
 
 | Bank Transaction Field | Source |
 |---|---|
-| `date` | Convert `posted` (UNIX epoch) → date using connection's `transaction_timezone` |
+| `date` | Convert `posted` (UNIX epoch) → date using UTC. SimpleFIN Bridge normalises timestamps to noon UTC, so timezone conversion is unnecessary. |
 | `bank_account` | From account mapping (`erpnext_bank_account`) |
 | `description` | SimpleFIN `description` (sanitized) |
 | `deposit` | `amount` if positive (as absolute float) |
@@ -463,8 +459,8 @@ If cancelled records were excluded from the dedup check, the rolling window woul
 **Chunk strategy — newest-first with smart stop:**
 
 ```python
-def build_chunks(start_date, end_date, max_days=90):
-    """Split a date range into ≤90-day chunks, newest first.
+def build_chunks(start_date, end_date, max_days=45):
+    """Split a date range into ≤45-day chunks, newest first.
 
     Example: 180-day range (Jan 1 → Jun 30) produces:
       Chunk 1: Apr 1 → Jun 30  (most recent)
@@ -617,7 +613,7 @@ def contains_rate_limit_warning(errors: list[str]) -> bool:
 
 SimpleFIN provides a `description` string and an optional `extra` object for each transaction. Unlike Plaid, SimpleFIN does not provide structured fields for merchant/party names or reference numbers. However, we can extract useful data from what's available to improve ERPNext's automatic party matching and reconciliation matching.
 
-**Enrichment is configurable per connection.** Each SimpleFIN Connection has four fields that control extraction behavior:
+**Enrichment is configurable per account.** Each SimpleFIN Account Mapping row has four fields that control extraction behavior (a single connection may aggregate accounts from multiple institutions with different description formats):
 - `extract_reference_number` (Check) — enables/disables reference number extraction. Default: on.
 - `custom_reference_regex` (Small Text) — optional custom regex. If set, overrides built-in patterns.
 - `extract_party_name` (Check) — enables/disables party name extraction. Default: on.
@@ -1168,51 +1164,38 @@ Use Frappe's built-in notification system (`frappe.sendmail`, `frappe.publish_re
 ## 10. App Structure
 
 ```
-sync_simplefin/
-├── sync_simplefin/
+sync_simplefin/                              # App root (Python package)
+├── __init__.py                              # __version__ = "1.0.0"
+├── hooks.py                                 # Frappe hooks: install, scheduler, doc_events, CSS
+├── install.py                               # Custom fields on Bank Transaction + dedup index
+├── tasks.py                                 # Scheduled task handlers
+├── public/css/
+│   └── sync_simplefin.css                   # Grid text wrapping overrides
+├── workspace_sidebar/
+│   └── sync_via_simplefin.json              # Sidebar navigation items (standard:1)
+├── desktop_icon/
+│   └── sync_via_simplefin.json              # Desktop icon (standard:1)
+├── utils/
 │   ├── __init__.py
-│   ├── hooks.py
-│   ├── patches/                          # Data migration patches
-│   ├── sync_simplefin/
-│   │   ├── doctype/
-│   │   │   ├── simplefin_connection/
-│   │   │   │   ├── simplefin_connection.py
-│   │   │   │   ├── simplefin_connection.js
-│   │   │   │   ├── simplefin_connection.json
-│   │   │   │   └── test_simplefin_connection.py
-│   │   │   ├── simplefin_account_mapping/
-│   │   │   │   ├── simplefin_account_mapping.py
-│   │   │   │   └── simplefin_account_mapping.json
-│   │   │   ├── sync_simplefin_log/
-│   │   │   │   ├── sync_simplefin_log.py
-│   │   │   │   ├── sync_simplefin_log.js
-│   │   │   │   └── sync_simplefin_log.json
-│   │   │   ├── simplefin_balance_snapshot/
-│   │   │   │   ├── simplefin_balance_snapshot.py
-│   │   │   │   └── simplefin_balance_snapshot.json
-│   │   │   └── sync_simplefin_settings/
-│   │   │       ├── sync_simplefin_settings.py
-│   │   │       └── sync_simplefin_settings.json
-│   │   └── workspace/
-│   │       └── sync_simplefin/
-│   │           └── sync_simplefin.json     # Workspace with shortcuts
-│   ├── api/
-│   │   ├── __init__.py
-│   │   └── simplefin.py                   # Whitelisted API methods
-│   ├── utils/
-│   │   ├── __init__.py
-│   │   ├── simplefin_client.py            # HTTP client for SimpleFIN API
-│   │   ├── sync.py                        # Core sync logic
-│   │   ├── enrichment.py                  # Transaction data enrichment (reference_number, party_name)
-│   │   └── notifications.py               # Notification helpers
-│   ├── tasks.py                           # Scheduled task handlers
-│   └── install.py                         # Post-install setup (custom fields)
-├── setup.py
-├── setup.cfg
-├── requirements.txt                       # Empty or minimal — `requests` is a Frappe core dep
-├── license.txt                            # GPL-3.0
-├── MANIFEST.in
-└── README.md
+│   ├── simplefin_client.py                  # HTTP client for SimpleFIN API
+│   ├── sync.py                              # Core sync logic
+│   ├── enrichment.py                        # Transaction data enrichment
+│   ├── notifications.py                     # Notification helpers
+│   └── tests/                               # 123 unit tests (all mocked)
+├── sync_via_simplefin/                      # Module root (matches frappe.scrub of module name)
+│   ├── doctype/
+│   │   ├── simplefin_connection/            # Main config DocType (SFIN-####)
+│   │   ├── simplefin_account_mapping/       # Child table: per-account config + enrichment
+│   │   ├── simplefin_sync_log/              # Sync run history
+│   │   ├── simplefin_balance_snapshot/      # Child table: balance data
+│   │   └── simplefin_sync_settings/         # Single DocType: global settings
+│   └── workspace/
+│       └── sync_via_simplefin/
+│           └── sync_via_simplefin.json      # Workspace content page
+├── pyproject.toml                           # flit_core build, Frappe dependencies
+├── license.txt                              # GPL-3.0
+├── README.md
+└── PRIVACY.md
 ```
 
 ### 10.1 hooks.py Key Entries
@@ -1422,7 +1405,7 @@ The following deviations and additions were discovered during v1.0 implementatio
 ### 16.3 DocType JSON Deviations
 
 - **Password field length:** `setup_token` and `access_url` require `"length": 500` because SimpleFIN setup tokens are ~240 characters (Frappe Password default max is 140).
-- **Transaction timezone:** The `transaction_timezone` Select field has `"options": ""` in the JSON; options are populated dynamically via a whitelisted method (`get_timezone_options()`) that returns `zoneinfo.available_timezones()`. Default is set in `before_insert` from `System Settings.time_zone`.
+- **Transaction timezone:** Removed entirely — see Section 16.10. SimpleFIN Bridge normalises to noon UTC.
 
 ### 16.4 Connection Deletion
 
