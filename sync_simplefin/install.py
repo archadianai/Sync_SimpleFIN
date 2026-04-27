@@ -81,7 +81,7 @@ def after_install() -> None:
 	# Create composite index for fast dedup lookups.
 	_create_dedup_index()
 
-	frappe.db.commit()
+	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- persist custom-field DDL outside install transaction
 
 
 def after_uninstall() -> None:
@@ -97,7 +97,7 @@ def after_uninstall() -> None:
 
 	_drop_dedup_index()
 
-	frappe.db.commit()
+	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- persist custom-field DDL removal outside uninstall transaction
 
 
 def _create_dedup_index() -> None:
