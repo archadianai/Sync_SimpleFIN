@@ -80,7 +80,7 @@ def cleanup_old_sync_logs() -> None:
 		frappe.delete_doc("SimpleFIN Sync Log", log_name, force=True)
 
 	if old_logs:
-		frappe.db.commit()
+		frappe.db.commit()  # nosemgrep: frappe-manual-commit -- persist sync-log deletions in scheduler context
 
 
 # ---------------------------------------------------------------------------
@@ -257,7 +257,7 @@ def _enqueue_sync(conn, reset_retries: bool) -> None:
 		job_id=f"sync_simplefin_{conn.name}",
 		timeout=600,
 	)
-	frappe.db.commit()
+	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- background sync worker must observe Queued state
 
 
 # ---------------------------------------------------------------------------

@@ -65,7 +65,7 @@ def run_sync(connection: str, sync_type: str = "Manual") -> None:
 	conn.sync_state = "Syncing"
 	conn.last_sync_attempt = now_datetime()
 	conn.save(ignore_permissions=True)
-	frappe.db.commit()
+	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- persist Syncing state for UI visibility during long-running sync
 
 	sync_log = _create_sync_log(conn, sync_type)
 
@@ -114,7 +114,7 @@ def run_sync(connection: str, sync_type: str = "Manual") -> None:
 		sync_log.completed_at = now_datetime()
 		sync_log.save(ignore_permissions=True)
 
-	frappe.db.commit()
+	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- persist final sync state and log on success or failure
 
 
 def on_bank_transaction_trash(doc, method) -> None:
@@ -149,7 +149,7 @@ def _do_sync(conn, sync_log) -> None:
 	sync_log.request_end_date = datetime.utcfromtimestamp(end_ts)
 	sync_log.chunks_requested = len(chunks)
 	sync_log.save(ignore_permissions=True)
-	frappe.db.commit()
+	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- persist sync log header before chunk loop
 
 	total_created = 0
 	total_retrieved = 0
@@ -247,11 +247,11 @@ def _do_sync(conn, sync_log) -> None:
 
 			# Commit in batches
 			if chunk_created > 0 and chunk_created % COMMIT_BATCH_SIZE == 0:
-				frappe.db.commit()
+				frappe.db.commit()  # nosemgrep: frappe-manual-commit -- batch commit every 100 transactions during long-running sync
 
 		total_retrieved += chunk_txn_count
 		total_created += chunk_created
-		frappe.db.commit()
+		frappe.db.commit()  # nosemgrep: frappe-manual-commit -- per-chunk commit so partial progress survives mid-sync failure
 
 		# Stop conditions (spec Section 5.4)
 		if chunk_txn_count == 0:
@@ -296,7 +296,7 @@ def _do_sync(conn, sync_log) -> None:
 			frappe.utils.escape_html(e) for e in all_simplefin_errors
 		)
 	sync_log.save(ignore_permissions=True)
-	frappe.db.commit()
+	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- persist final sync-log counts after chunk loop
 
 
 # ---------------------------------------------------------------------------
@@ -538,7 +538,7 @@ def _update_account_mappings(conn, accounts: list[dict]) -> None:
 
 	if changed:
 		conn.save(ignore_permissions=True)
-		frappe.db.commit()
+		frappe.db.commit()  # nosemgrep: frappe-manual-commit -- persist account mapping auto-discovery during sync
 
 	# Notify about disappeared accounts
 	for m in newly_missing:
@@ -614,7 +614,7 @@ def _activate_rate_limit_pause(conn) -> None:
 	conn.rate_limit_paused_until = pause_until
 	conn.connection_status = "Rate Limited"
 	conn.save(ignore_permissions=True)
-	frappe.db.commit()
+	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- persist rate-limit pause immediately so other workers respect it
 
 	notify_sync_failure(
 		conn,
@@ -639,7 +639,7 @@ def _create_sync_log(conn, sync_type: str):
 		"started_at": now_datetime(),
 	})
 	log.insert(ignore_permissions=True)
-	frappe.db.commit()
+	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- persist initial sync-log row so it's visible while sync runs
 	return log
 
 
