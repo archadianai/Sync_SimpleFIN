@@ -102,30 +102,23 @@ def after_uninstall() -> None:
 
 def _create_dedup_index() -> None:
 	"""Create index on (simplefin_account_id, simplefin_transaction_id) for Bank Transaction."""
-	table = "tabBank Transaction"
-	index_name = "idx_simplefin_dedup"
-
 	# Check if index already exists.
 	existing = frappe.db.sql(
-		"SHOW INDEX FROM `{table}` WHERE Key_name = %s".format(table=table),
-		(index_name,),
+		"SHOW INDEX FROM `tabBank Transaction` WHERE Key_name = %s",
+		("idx_simplefin_dedup",),
 	)
 	if not existing:
 		frappe.db.sql(
-			"CREATE INDEX `{idx}` ON `{table}` "
-			"(`simplefin_account_id`, `simplefin_transaction_id`)".format(
-				idx=index_name, table=table
-			)
+			"CREATE INDEX `idx_simplefin_dedup` ON `tabBank Transaction` "
+			"(`simplefin_account_id`, `simplefin_transaction_id`)"
 		)
 
 
 def _drop_dedup_index() -> None:
 	"""Drop the dedup index if it exists."""
-	table = "tabBank Transaction"
-	index_name = "idx_simplefin_dedup"
 	try:
 		frappe.db.sql(
-			"DROP INDEX `{idx}` ON `{table}`".format(idx=index_name, table=table)
+			"DROP INDEX `idx_simplefin_dedup` ON `tabBank Transaction`"
 		)
 	except Exception:
 		pass
