@@ -15,6 +15,7 @@ from frappe.tests.utils import FrappeTestCase
 from sync_simplefin.tasks import (
 	_evaluate_connection,
 	_parse_time,
+	is_overdue,
 	is_regular_interval_due,
 )
 
@@ -29,6 +30,7 @@ def _make_conn(**kwargs) -> frappe._dict:
 		"sync_day_of_week": "Monday",
 		"sync_day_of_month": 1,
 		"last_sync_attempt": None,
+		"last_successful_sync": None,
 		"retry_count": 3,
 		"retry_attempts_used": 0,
 		"retry_interval_minutes": 30,
@@ -371,3 +373,170 @@ class TestParseTime(FrappeTestCase):
 
 	def test_empty_string(self):
 		self.assertEqual(_parse_time(""), (2, 0))
+
+
+# ---------------------------------------------------------------------------
+# is_overdue tests (catch-up safety net)
+# ---------------------------------------------------------------------------
+
+class TestIsOverdue(FrappeTestCase):
+	"""Tests for is_overdue() — self-healing catch-up when scheduler misses
+	the regular window."""
+
+	def test_never_succeeded_not_overdue(self):
+		"""No last_successful_sync → not overdue (let initial sync drive)."""
+		conn = _make_conn(sync_frequency="Daily", last_successful_sync=None)
+		self.assertFalse(is_overdue(conn, datetime(2026, 5, 11, 14, 0)))
+
+	def test_unknown_frequency_not_overdue(self):
+		"""Unknown frequency → defensive False."""
+		conn = _make_conn(
+			sync_frequency="Annually",  # not in CATCHUP_THRESHOLD_MINUTES
+			last_successful_sync=datetime(2020, 1, 1),
+		)
+		self.assertFalse(is_overdue(conn, datetime(2026, 5, 11, 14, 0)))
+
+	# --- Daily ---
+
+	def test_daily_within_threshold_not_overdue(self):
+		"""24h after last success (< 25h threshold) → not overdue."""
+		now = datetime(2026, 5, 11, 2, 0)
+		conn = _make_conn(
+			sync_frequency="Daily",
+			last_successful_sync=now - timedelta(hours=24),
+		)
+		self.assertFalse(is_overdue(conn, now))
+
+	def test_daily_past_threshold_overdue(self):
+		"""26h after last success (> 25h threshold) → overdue."""
+		now = datetime(2026, 5, 11, 4, 0)
+		conn = _make_conn(
+			sync_frequency="Daily",
+			last_successful_sync=now - timedelta(hours=26),
+		)
+		self.assertTrue(is_overdue(conn, now))
+
+	def test_daily_two_days_missed_overdue(self):
+		"""The actual user scenario — 72h since last success → overdue."""
+		now = datetime(2026, 5, 11, 13, 56)
+		conn = _make_conn(
+			sync_frequency="Daily",
+			last_successful_sync=datetime(2026, 5, 8, 2, 0, 31),
+		)
+		self.assertTrue(is_overdue(conn, now))
+
+	# --- Sub-daily ---
+
+	def test_every_2_hours_within_threshold(self):
+		now = datetime(2026, 5, 11, 14, 0)
+		conn = _make_conn(
+			sync_frequency="Every 2 Hours",
+			last_successful_sync=now - timedelta(hours=2, minutes=30),
+		)
+		self.assertFalse(is_overdue(conn, now))
+
+	def test_every_2_hours_past_threshold(self):
+		"""3h 5min since last success (> 3h threshold) → overdue."""
+		now = datetime(2026, 5, 11, 14, 0)
+		conn = _make_conn(
+			sync_frequency="Every 2 Hours",
+			last_successful_sync=now - timedelta(hours=3, minutes=5),
+		)
+		self.assertTrue(is_overdue(conn, now))
+
+	def test_twice_daily_past_threshold(self):
+		"""15h since last success (> 14h threshold) → overdue."""
+		now = datetime(2026, 5, 11, 14, 0)
+		conn = _make_conn(
+			sync_frequency="Twice Daily",
+			last_successful_sync=now - timedelta(hours=15),
+		)
+		self.assertTrue(is_overdue(conn, now))
+
+	# --- Long-period frequencies ---
+
+	def test_weekly_within_threshold(self):
+		"""7 days since last success (< 8d threshold) → not overdue."""
+		now = datetime(2026, 5, 11, 14, 0)
+		conn = _make_conn(
+			sync_frequency="Weekly",
+			last_successful_sync=now - timedelta(days=7),
+		)
+		self.assertFalse(is_overdue(conn, now))
+
+	def test_weekly_past_threshold(self):
+		"""9 days since last success (> 8d threshold) → overdue."""
+		now = datetime(2026, 5, 11, 14, 0)
+		conn = _make_conn(
+			sync_frequency="Weekly",
+			last_successful_sync=now - timedelta(days=9),
+		)
+		self.assertTrue(is_overdue(conn, now))
+
+	def test_monthly_past_threshold(self):
+		"""33 days since last success (> 32d threshold) → overdue."""
+		now = datetime(2026, 5, 11, 14, 0)
+		conn = _make_conn(
+			sync_frequency="Monthly",
+			last_successful_sync=now - timedelta(days=33),
+		)
+		self.assertTrue(is_overdue(conn, now))
+
+
+# ---------------------------------------------------------------------------
+# _evaluate_connection catch-up branch (integration)
+# ---------------------------------------------------------------------------
+
+class TestEvaluateConnectionCatchup(FrappeTestCase):
+	"""Verify the catch-up branch fires when overdue but not regularly-due."""
+
+	@patch("sync_simplefin.tasks._enqueue_sync")
+	def test_catchup_fires_on_idle_overdue(self, mock_enqueue):
+		"""Idle + last success > 25h ago + not regular-interval-due → catch-up."""
+		# 14:00 is NOT 02:00, so regular-daily is not due. But last success
+		# was 3 days ago, so catch-up should fire.
+		now = datetime(2026, 5, 11, 14, 0)
+		conn = _make_conn(
+			sync_state="Idle",
+			sync_frequency="Daily",
+			sync_time="02:00",
+			# last_sync_attempt today (so regular-due returns False)
+			last_sync_attempt=datetime(2026, 5, 11, 2, 0),
+			# but last SUCCESSFUL sync was days ago (so overdue is True)
+			last_successful_sync=datetime(2026, 5, 8, 2, 0, 31),
+		)
+		# Regular-due would normally fire today after 02:00 since
+		# last_sync_attempt today suppresses it; verify our setup:
+		self.assertFalse(is_regular_interval_due(conn, now))
+
+		_evaluate_connection(conn, now)
+		mock_enqueue.assert_called_once_with(conn, reset_retries=True)
+
+	@patch("sync_simplefin.tasks._enqueue_sync")
+	def test_no_catchup_when_recently_successful(self, mock_enqueue):
+		"""Idle + last success recent → no catch-up."""
+		now = datetime(2026, 5, 11, 14, 0)
+		conn = _make_conn(
+			sync_state="Idle",
+			sync_frequency="Daily",
+			sync_time="02:00",
+			last_sync_attempt=datetime(2026, 5, 11, 2, 0),
+			last_successful_sync=datetime(2026, 5, 11, 2, 0, 31),
+		)
+		_evaluate_connection(conn, now)
+		mock_enqueue.assert_not_called()
+
+	@patch("sync_simplefin.tasks._enqueue_sync")
+	def test_no_catchup_when_failed(self, mock_enqueue):
+		"""Failed state → no catch-up (would risk rapid retry loops)."""
+		now = datetime(2026, 5, 11, 14, 0)
+		conn = _make_conn(
+			sync_state="Failed",
+			sync_frequency="Daily",
+			sync_time="02:00",
+			last_sync_attempt=datetime(2026, 5, 11, 2, 0),
+			last_successful_sync=datetime(2026, 5, 8, 2, 0),
+		)
+		_evaluate_connection(conn, now)
+		mock_enqueue.assert_not_called()
+

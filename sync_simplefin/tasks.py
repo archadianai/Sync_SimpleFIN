@@ -26,6 +26,22 @@ FREQUENCY_MINUTES = {
 # than this, assume the worker crashed and reset to Failed.
 STALE_THRESHOLD_SECONDS = 1800  # 30 minutes
 
+# Catch-up thresholds — minutes since last_successful_sync above which we
+# treat a connection as overdue, regardless of the configured sync_time /
+# sync_day. Acts as a self-healing safety net when the Frappe scheduler
+# misses its regular window (e.g. infra downtime, deploys, queue stalls).
+# Thresholds are set just past the nominal interval to keep recovery quick
+# while avoiding noisy catch-up firing for benign clock jitter.
+CATCHUP_THRESHOLD_MINUTES = {
+	"Every 2 Hours": 180,    # 3 hours (1.5× nominal)
+	"4x Daily": 480,         # 8 hours (≈1.33× nominal 6h)
+	"Twice Daily": 840,      # 14 hours (≈1.17× nominal 12h)
+	"Daily": 1500,           # 25 hours
+	"Weekly": 11520,         # 8 days
+	"Bi-Weekly": 21600,      # 15 days
+	"Monthly": 46080,        # 32 days
+}
+
 
 # ---------------------------------------------------------------------------
 # Scheduler entry points
@@ -125,8 +141,24 @@ def _evaluate_connection(conn, now) -> None:
 			_enqueue_sync(conn, reset_retries=False)
 		return
 
-	# IDLE or FAILED
-	if conn.sync_state in ("Idle", "Failed"):
+	# IDLE
+	if conn.sync_state == "Idle":
+		if is_regular_interval_due(conn, now):
+			_enqueue_sync(conn, reset_retries=True)
+		elif is_overdue(conn, now):
+			# Catch-up: scheduler missed the regular sync window
+			# (e.g. Frappe Cloud "All" scheduler downtime). Fire now so we
+			# don't wait until the next configured sync_time.
+			frappe.logger(__name__).info(
+				f"SimpleFIN Connection {conn.name}: catch-up sync "
+				f"({conn.sync_frequency}, last_successful_sync is stale)"
+			)
+			_enqueue_sync(conn, reset_retries=True)
+
+	# FAILED — only regular-interval recovery; catch-up would risk
+	# rapid retry on a permanently-broken connection. Existing
+	# notification logic already alerts the user about Failed state.
+	elif conn.sync_state == "Failed":
 		if is_regular_interval_due(conn, now):
 			_enqueue_sync(conn, reset_retries=True)
 
@@ -134,6 +166,34 @@ def _evaluate_connection(conn, now) -> None:
 # ---------------------------------------------------------------------------
 # Frequency / interval logic
 # ---------------------------------------------------------------------------
+
+def is_overdue(conn, now=None) -> bool:
+	"""Return True if last_successful_sync is older than the catch-up threshold
+	for the configured frequency.
+
+	Used as a self-healing fallback when the Frappe scheduler misses the
+	regular sync window (infra downtime, deploys, queue stalls). Compares
+	against ``last_successful_sync`` rather than ``last_sync_attempt`` so a
+	connection that's been failing isn't repeatedly retriggered — only
+	connections that haven't actually succeeded in too long are caught up.
+	"""
+	if now is None:
+		now = now_datetime()
+
+	freq = conn.get("sync_frequency") if hasattr(conn, "get") else conn.sync_frequency
+	threshold_minutes = CATCHUP_THRESHOLD_MINUTES.get(freq)
+	if threshold_minutes is None:
+		return False
+
+	last = conn.get("last_successful_sync") if hasattr(conn, "get") else conn.last_successful_sync
+	if not last:
+		# Never succeeded — let the regular initial-sync path drive things;
+		# catch-up wouldn't add value over the user's first manual sync.
+		return False
+
+	elapsed_minutes = (now - get_datetime(last)).total_seconds() / 60
+	return elapsed_minutes > threshold_minutes
+
 
 def is_regular_interval_due(conn, now=None) -> bool:
 	"""Determine whether the regular sync interval has arrived.
