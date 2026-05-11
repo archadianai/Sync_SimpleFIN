@@ -277,6 +277,10 @@ def _do_sync(conn, sync_log) -> None:
 	conn.last_sync_end_date = end_ts
 	conn.save(ignore_permissions=True)
 
+	# Persist accumulated balance snapshots (child rows appended in the chunk
+	# loop) before reload, otherwise reload() discards them.
+	sync_log.save(ignore_permissions=True)
+
 	# Finalize sync log
 	sync_log.reload()
 	sync_log.transactions_retrieved = total_retrieved
