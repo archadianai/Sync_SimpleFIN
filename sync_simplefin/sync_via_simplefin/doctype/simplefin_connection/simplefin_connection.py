@@ -216,7 +216,6 @@ def reregister(connection: str, setup_token: str) -> None:
 	conn.registration_date = now_datetime()
 	conn.enabled = 1
 	conn.save(ignore_permissions=True)
-	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- persist new credentials immediately after re-registration
 
 
 @frappe.whitelist()
@@ -256,7 +255,6 @@ def register_token(connection: str) -> None:
 	conn.registration_date = now_datetime()
 	conn.connection_status = "Active"
 	conn.save(ignore_permissions=True)
-	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- persist credentials before fetching account list (recoverable on HTTP failure)
 
 	# Auto-populate account mappings by fetching the account list
 	_populate_account_mappings(conn, SimpleFINClient(access_url))
@@ -328,8 +326,8 @@ def sync_now(connection: str) -> None:
 		deduplicate=True,
 		job_id=f"sync_simplefin_{conn.name}",
 		timeout=600,
+		enqueue_after_commit=True,
 	)
-	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- background sync worker must observe Queued state
 
 
 @frappe.whitelist()
@@ -358,8 +356,8 @@ def sync_full(connection: str) -> None:
 		deduplicate=True,
 		job_id=f"sync_simplefin_{conn.name}",
 		timeout=600,
+		enqueue_after_commit=True,
 	)
-	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- background sync worker must observe Queued state
 
 
 @frappe.whitelist()
@@ -376,7 +374,6 @@ def clear_rate_limit_pause(connection: str) -> None:
 			"connection_status": "Active",
 		},
 	)
-	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- ensure cleared pause is visible to scheduler/workers immediately
 
 
 @frappe.whitelist()
@@ -409,7 +406,6 @@ def wizard_register(connection_name: str, setup_token: str) -> dict:
 		"on_record_mismatch": "System Notification",
 	})
 	conn.insert(ignore_permissions=True)
-	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- persist Connection before external HTTP token-exchange call
 
 	# Exchange the token
 	token_value = conn.get_password("setup_token")
@@ -419,9 +415,7 @@ def wizard_register(connection_name: str, setup_token: str) -> dict:
 	try:
 		access_url = SimpleFINClient.claim_access_url(token_value)
 	except SimpleFINAuthError:
-		# Clean up the connection on failure
-		frappe.delete_doc("SimpleFIN Connection", conn.name, force=True)
-		frappe.db.commit()  # nosemgrep: frappe-manual-commit -- persist Connection cleanup before raising
+		# frappe.throw rolls back the in-progress transaction (including the insert above)
 		frappe.throw(
 			_(
 				"This setup token has already been used or is compromised. "
@@ -429,8 +423,7 @@ def wizard_register(connection_name: str, setup_token: str) -> dict:
 			)
 		)
 	except SimpleFINError as e:
-		frappe.delete_doc("SimpleFIN Connection", conn.name, force=True)
-		frappe.db.commit()  # nosemgrep: frappe-manual-commit -- persist Connection cleanup before raising
+		# frappe.throw rolls back the in-progress transaction (including the insert above)
 		frappe.throw(_("Registration failed: {0}").format(str(e)))
 
 	# Store credentials
@@ -441,7 +434,6 @@ def wizard_register(connection_name: str, setup_token: str) -> dict:
 	conn.registration_date = now_datetime()
 	conn.connection_status = "Active"
 	conn.save(ignore_permissions=True)
-	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- persist credentials before fetching account list
 
 	# Fetch accounts
 	client = SimpleFINClient(access_url)
@@ -500,7 +492,6 @@ def wizard_save_mappings(connection: str, mappings: str) -> None:
 
 	conn.enabled = 1
 	conn.save(ignore_permissions=True)
-	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- persist mappings so subsequent sync sees the active state
 
 
 # ---------------------------------------------------------------------------
@@ -549,4 +540,3 @@ def _populate_account_mappings(conn, client) -> None:
 
 	if changed:
 		conn.save(ignore_permissions=True)
-		frappe.db.commit()  # nosemgrep: frappe-manual-commit -- persist auto-discovered account mappings

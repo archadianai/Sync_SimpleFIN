@@ -134,3 +134,63 @@ class TestUnixToDate(FrappeTestCase):
 		# SimpleFIN normalises to noon UTC — verify the date is unambiguous
 		ts = 1700049600  # 2023-11-15 12:00:00 UTC
 		self.assertEqual(_unix_to_date(ts), date(2023, 11, 15))
+
+
+# ---------------------------------------------------------------------------
+# Balance snapshot persistence (regression test)
+# ---------------------------------------------------------------------------
+
+class TestBalanceSnapshotPersistence(FrappeTestCase):
+	"""Regression test — balance snapshots appended in memory must survive
+	a save+reload cycle. Pre-fix, _do_sync's reload() wiped the in-memory
+	child rows that the chunk loop had appended."""
+
+	def test_snapshots_persist_through_save_and_reload(self):
+		"""_store_balance_snapshot + save() + reload() keeps child rows intact."""
+		from sync_simplefin.utils.sync import _store_balance_snapshot
+
+		conn = frappe.get_doc({
+			"doctype": "SimpleFIN Connection",
+			"connection_name": f"TestBalSnap_{frappe.generate_hash(length=6)}",
+			"is_registered": 0,
+			"enabled": 0,
+			"sync_frequency": "Daily",
+			"on_sync_failure": "Log Only",
+			"on_empty_account": "Log Only",
+			"on_record_mismatch": "Log Only",
+		})
+		conn.insert(ignore_permissions=True)
+
+		log = frappe.get_doc({
+			"doctype": "SimpleFIN Sync Log",
+			"connection": conn.name,
+			"sync_type": "Manual",
+			"status": "In Progress",
+			"started_at": frappe.utils.now_datetime(),
+		})
+		log.insert(ignore_permissions=True)
+
+		_store_balance_snapshot(log, {
+			"id": "acct-test-1",
+			"name": "Test Checking",
+			"currency": "USD",
+			"balance": "1234.56",
+			"available-balance": "1200.00",
+			"balance-date": 1700049600,  # 2023-11-15 12:00 UTC
+		})
+		self.assertEqual(len(log.balance_snapshot), 1, "in-memory append")
+
+		# The fix: save before reload so child rows are persisted
+		log.save(ignore_permissions=True)
+		log.reload()
+
+		# Child row survived the reload
+		self.assertEqual(len(log.balance_snapshot), 1)
+		self.assertEqual(log.balance_snapshot[0].simplefin_account_id, "acct-test-1")
+		self.assertEqual(log.balance_snapshot[0].simplefin_account_name, "Test Checking")
+		self.assertEqual(log.balance_snapshot[0].currency, "USD")
+		self.assertEqual(float(log.balance_snapshot[0].balance), 1234.56)
+		self.assertEqual(float(log.balance_snapshot[0].available_balance), 1200.00)
+
+		log.delete()
+		conn.delete()

@@ -1,7 +1,7 @@
 [project]
 name = "sync_simplefin"
 authors = [
-    { name = "Steve Bourg", email = "steve@bourg.com"}
+    { name = "Steve Bourg", email = "steve@archadianai.com"}
 ]
 description = "Bank transaction sync via SimpleFIN Bridge for ERPNext"
 requires-python = ">=3.14"
