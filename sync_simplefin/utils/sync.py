@@ -65,7 +65,6 @@ def run_sync(connection: str, sync_type: str = "Manual") -> None:
 	conn.sync_state = "Syncing"
 	conn.last_sync_attempt = now_datetime()
 	conn.save(ignore_permissions=True)
-	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- long-running job; without this the UI shows Queued for the entire sync duration (potentially minutes)
 
 	sync_log = _create_sync_log(conn, sync_type)
 
@@ -613,7 +612,8 @@ def _activate_rate_limit_pause(conn) -> None:
 	conn.rate_limit_paused_until = pause_until
 	conn.connection_status = "Rate Limited"
 	conn.save(ignore_permissions=True)
-	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- pause must survive a subsequent crash; if the job rolls back here, the next scheduler tick re-hits the API and SimpleFIN can escalate to disabling the token
+	# No manual commit needed — the chunk loop's per-chunk commit at line ~250
+	# fires immediately after this call returns and persists the pause.
 
 	notify_sync_failure(
 		conn,
