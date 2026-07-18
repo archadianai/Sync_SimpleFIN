@@ -65,16 +65,25 @@ DEMO_ACCOUNTS_RESPONSE = {
 }
 
 
-def _mock_response(status_code: int, text: str = "", json_data=None):
-	"""Create a mock requests.Response."""
+def _mock_response(status_code: int, text: str = "", json_data=None, headers=None):
+	"""Create a mock requests.Response.
+
+	The client reads bodies via ``iter_content`` (stream=True), so the mock
+	exposes ``iter_content`` and ``headers`` in addition to ``text``/``json``.
+	"""
 	resp = MagicMock()
 	resp.status_code = status_code
-	resp.text = text
+	body = text
 	if json_data is not None:
+		body = json.dumps(json_data)
 		resp.json.return_value = json_data
-		resp.text = json.dumps(json_data)
 	else:
 		resp.json.side_effect = ValueError("No JSON")
+	resp.text = body
+	body_bytes = body.encode()
+	resp.content = body_bytes
+	resp.headers = headers or {}
+	resp.iter_content = lambda chunk_size=65536: iter([body_bytes] if body_bytes else [])
 	return resp
 
 
@@ -249,6 +258,39 @@ class TestGetAccounts(FrappeTestCase):
 		# params is a list of tuples for repeated keys
 		account_params = [v for k, v in params if k == "account"]
 		self.assertEqual(account_params, ["ACT-001", "ACT-002"])
+
+	@patch("sync_simplefin.utils.simplefin_client.requests.get")
+	def test_redirects_disabled(self, mock_get):
+		"""Requests must be made with allow_redirects=False (finding 5)."""
+		mock_get.return_value = _mock_response(200, json_data={"errors": [], "accounts": []})
+
+		self.client.get_accounts()
+
+		self.assertFalse(mock_get.call_args[1]["allow_redirects"])
+		self.assertTrue(mock_get.call_args[1]["stream"])
+
+	@patch("sync_simplefin.utils.simplefin_client.requests.get")
+	def test_redirect_status_is_not_followed(self, mock_get):
+		"""A 302 (not followed) surfaces as an HTTP error, not a parsed body."""
+		mock_get.return_value = _mock_response(302, text="Moved")
+
+		with self.assertRaises(SimpleFINHTTPError):
+			self.client.get_accounts()
+
+	@patch("sync_simplefin.utils.simplefin_client.requests.get")
+	def test_oversized_response_rejected(self, mock_get):
+		"""A Content-Length over the cap is rejected before parsing."""
+		from sync_simplefin.utils.simplefin_client import MAX_RESPONSE_BYTES
+
+		resp = _mock_response(
+			200,
+			json_data={"errors": [], "accounts": []},
+			headers={"Content-Length": str(MAX_RESPONSE_BYTES + 1)},
+		)
+		mock_get.return_value = resp
+
+		with self.assertRaises(SimpleFINError):
+			self.client.get_accounts()
 
 	@patch("sync_simplefin.utils.simplefin_client.requests.get")
 	def test_403_revoked(self, mock_get):

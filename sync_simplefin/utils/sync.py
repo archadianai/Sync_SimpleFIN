@@ -29,7 +29,6 @@ from sync_simplefin.utils.simplefin_client import (
 	SimpleFINAuthError,
 	SimpleFINClient,
 	SimpleFINError,
-	SimpleFINHTTPError,
 	SimpleFINPaymentRequired,
 )
 
@@ -49,7 +48,7 @@ COMMIT_BATCH_SIZE = 100
 # Public entry point
 # ---------------------------------------------------------------------------
 
-def run_sync(connection: str, sync_type: str = "Manual") -> None:
+def run_sync(connection: str, sync_type: str = "Manual", full: bool = False) -> None:
 	"""Run a full sync for the given SimpleFIN Connection.
 
 	Called from ``frappe.enqueue`` via the scheduler or the *Sync Now* button.
@@ -58,6 +57,10 @@ def run_sync(connection: str, sync_type: str = "Manual") -> None:
 	Args:
 		connection: SimpleFIN Connection document name.
 		sync_type: "Scheduled", "Manual", or "Test".
+		full: True when the user explicitly requested a full-history walk
+			(Sync Full button) — suppresses the early-stop conditions so
+			every chunk is fetched. A first-ever sync is NOT "full": it
+			still stops at the first empty chunk to conserve API quota.
 	"""
 	conn = frappe.get_doc("SimpleFIN Connection", connection)
 
@@ -68,50 +71,92 @@ def run_sync(connection: str, sync_type: str = "Manual") -> None:
 
 	sync_log = _create_sync_log(conn, sync_type)
 
-	try:
-		_do_sync(conn, sync_log)
+	# Commit the sync-log creation and the Syncing transition before the chunk
+	# loop starts. The failure handler below rolls back to discard partial work
+	# from a failed chunk; without this commit that rollback would also erase the
+	# sync log and the state change, leaving no failure record and no retry.
+	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- persist sync-log + Syncing state so the failure handler can rely on them existing
 
-		# Success
+	try:
+		result = _do_sync(conn, sync_log, full_requested=full)
+
+		# Success (possibly partial). A rate-limit pause is set inside _do_sync
+		# and must NOT be cleared here — the scheduler lifts it on expiry.
+		rate_limited = bool(result.get("rate_limit_hit"))
+		had_errors = bool(result.get("error_count"))
+		partial = rate_limited or had_errors
+
 		conn.reload()
 		conn.sync_state = "Idle"
-		conn.last_sync_status = "Success"
+		conn.last_sync_status = "Partial Success" if partial else "Success"
 		conn.last_successful_sync = now_datetime()
 		conn.retry_attempts_used = 0
 		conn.next_retry_at = None
-		if conn.connection_status in ("Unknown", "Rate Limited"):
-			conn.connection_status = "Active"
-		conn.rate_limit_paused_until = None
+		if not rate_limited:
+			if conn.connection_status in ("Unknown", "Rate Limited"):
+				conn.connection_status = "Active"
+			conn.rate_limit_paused_until = None
 		conn.save(ignore_permissions=True)
 
 		sync_log.reload()
-		sync_log.status = "Success"
+		sync_log.status = "Partial Success" if partial else "Success"
 		sync_log.completed_at = now_datetime()
 		sync_log.save(ignore_permissions=True)
 
 	except Exception as e:
-		frappe.db.rollback()
-		conn.reload()
-		conn.last_sync_status = "Failed"
-		conn.last_sync_error = str(e)[:1000]
-		conn.retry_attempts_used = (conn.retry_attempts_used or 0) + 1
+		_handle_sync_failure(conn, sync_log, e)
 
-		if conn.retry_attempts_used < (conn.retry_count or 0):
-			conn.sync_state = "Retry Pending"
-			conn.next_retry_at = now_datetime() + timedelta(
-				minutes=conn.retry_interval_minutes or 30
-			)
+
+def _handle_sync_failure(conn, sync_log, exc: Exception) -> None:
+	"""Record a sync failure resiliently and schedule retry state.
+
+	Rolls back the uncommitted work from the failed chunk (the sync log and
+	the Syncing transition were committed before the loop, so they survive),
+	then persists ALL failure state here — including terminal connection
+	status derived from the exception type — after the rollback. Centralizing
+	the terminal-status writes post-rollback means no handler inside
+	``_do_sync`` ever needs a pre-raise commit for its state to survive.
+	"""
+	frappe.db.rollback()
+
+	# Revoked (403) and Payment Required (402) are terminal — retrying the same
+	# dead credential cannot help, so go straight to Failed without a retry.
+	terminal = isinstance(exc, (SimpleFINAuthError, SimpleFINPaymentRequired))
+
+	conn.reload()
+
+	if isinstance(exc, SimpleFINAuthError):
+		conn.connection_status = "Revoked"
+		conn.enabled = 0
+	elif isinstance(exc, SimpleFINPaymentRequired):
+		conn.connection_status = "Payment Required"
+
+	conn.last_sync_status = "Failed"
+	conn.last_sync_error = str(exc)[:1000]
+	conn.retry_attempts_used = (conn.retry_attempts_used or 0) + 1
+
+	if not terminal and conn.retry_attempts_used < (conn.retry_count or 0):
+		conn.sync_state = "Retry Pending"
+		conn.next_retry_at = now_datetime() + timedelta(
+			minutes=conn.retry_interval_minutes or 30
+		)
+	else:
+		conn.sync_state = "Failed"
+		conn.next_retry_at = None
+		if isinstance(exc, SimpleFINAuthError):
+			notify_connection_revoked(conn)
 		else:
-			conn.sync_state = "Failed"
-			conn.next_retry_at = None
-			notify_sync_failure(conn, str(e), sync_log.name)
+			notify_sync_failure(conn, str(exc), sync_log.name)
 
-		conn.save(ignore_permissions=True)
+	conn.save(ignore_permissions=True)
 
-		sync_log.reload()
-		sync_log.status = "Failed"
-		sync_log.error_message = frappe.get_traceback(with_context=False)[:5000]
-		sync_log.completed_at = now_datetime()
-		sync_log.save(ignore_permissions=True)
+	# The sync log was committed before the loop, so it still exists.
+	if frappe.db.exists("SimpleFIN Sync Log", sync_log.name):
+		log = frappe.get_doc("SimpleFIN Sync Log", sync_log.name)
+		log.status = "Failed"
+		log.error_message = frappe.get_traceback(with_context=False)[:5000]
+		log.completed_at = now_datetime()
+		log.save(ignore_permissions=True)
 
 
 def on_bank_transaction_trash(doc, method) -> None:
@@ -126,13 +171,36 @@ def on_bank_transaction_trash(doc, method) -> None:
 # Internal sync implementation
 # ---------------------------------------------------------------------------
 
-def _do_sync(conn, sync_log) -> None:
-	"""Execute the actual sync logic (Section 5.1 steps 3-7)."""
+def _do_sync(conn, sync_log, full_requested: bool = False) -> dict:
+	"""Execute the actual sync logic (Section 5.1 steps 3-7).
+
+	Args:
+		full_requested: explicit Sync Full — walk every chunk, ignoring
+			both early-stop conditions.
+
+	Returns:
+		A result dict with ``rate_limit_hit`` (bool) and ``error_count`` (int)
+		so the caller can decide the final sync-log status and whether to leave
+		a rate-limit pause in place.
+	"""
 	access_url = conn.get_password("access_url")
 	if not access_url:
 		raise SimpleFINError(_("No access URL stored. Please re-register."))
 
 	client = SimpleFINClient(access_url)
+
+	# A zero last_sync_end_date means the range starts from initial history:
+	# a first-ever sync, an explicit Sync Full, or a full walk that was
+	# interrupted (e.g. by a rate limit) before it could finish. For these,
+	# the all-duplicate stop must stay off so the walk can pass through
+	# already-imported newest chunks to reach an older gap. The EMPTY-chunk
+	# stop stays active unless the user explicitly requested Sync Full — a
+	# first sync should stop at the end of the account's history rather than
+	# burn API quota on empty chunks.
+	backfill_range = not conn.last_sync_end_date
+	detailed_logging = bool(
+		frappe.db.get_single_value("SimpleFIN Sync Settings", "enable_detailed_logging")
+	)
 
 	# Build active account mapping lookup
 	mapped = _get_active_mappings(conn)
@@ -153,35 +221,27 @@ def _do_sync(conn, sync_log) -> None:
 	total_pending = 0
 	total_cancelled = 0
 	total_mismatch = 0
+	total_error = 0
 	chunks_completed = 0
 	chunks_empty = 0
 	all_simplefin_errors: list[str] = []
 	rate_limit_hit = False
+	# Track transaction counts per active-mapped account across the whole run,
+	# for the empty-account notification (spec 9 item 2).
+	txns_per_account: dict[str, int] = {
+		m.simplefin_account_id: 0 for m in (mapped or [])
+	}
 
 	for i, (chunk_start, chunk_end) in enumerate(chunks):
-		try:
-			data = client.get_accounts(
-				start_date=chunk_start,
-				end_date=chunk_end,
-				account_ids=mapped_ids,
-				include_pending=bool(conn.include_pending),
-			)
-		except SimpleFINAuthError:
-			conn.reload()
-			conn.connection_status = "Revoked"
-			conn.enabled = 0
-			conn.save(ignore_permissions=True)
-			notify_connection_revoked(conn)
-			raise
-		except SimpleFINPaymentRequired:
-			conn.reload()
-			conn.connection_status = "Payment Required"
-			conn.save(ignore_permissions=True)
-			raise
-		except SimpleFINHTTPError:
-			raise
-		except SimpleFINError:
-			raise
+		# Client errors (403/402/network/HTTP) propagate to _handle_sync_failure,
+		# which derives terminal connection status from the exception type after
+		# its rollback — no pre-raise state writes or commits are needed here.
+		data = client.get_accounts(
+			start_date=chunk_start,
+			end_date=chunk_end,
+			account_ids=mapped_ids,
+			include_pending=bool(conn.include_pending),
+		)
 
 		chunks_completed += 1
 
@@ -208,6 +268,7 @@ def _do_sync(conn, sync_log) -> None:
 
 		chunk_txn_count = 0
 		chunk_created = 0
+		chunk_dup = 0
 
 		for acct in accounts:
 			acct_id = acct.get("id")
@@ -222,6 +283,7 @@ def _do_sync(conn, sync_log) -> None:
 
 			transactions = acct.get("transactions", [])
 			chunk_txn_count += len(transactions)
+			txns_per_account[acct_id] = txns_per_account.get(acct_id, 0) + len(transactions)
 
 			for txn in transactions:
 				# Skip pending unless enabled
@@ -236,10 +298,15 @@ def _do_sync(conn, sync_log) -> None:
 					chunk_created += 1
 				elif result == "duplicate":
 					total_dup += 1
+					chunk_dup += 1
 				elif result == "cancelled":
 					total_cancelled += 1
 				elif result == "mismatch":
 					total_mismatch += 1
+				elif result == "pending":
+					total_pending += 1
+				elif result == "error":
+					total_error += 1
 
 			# Commit in batches
 			if chunk_created > 0 and chunk_created % COMMIT_BATCH_SIZE == 0:
@@ -249,21 +316,15 @@ def _do_sync(conn, sync_log) -> None:
 		total_created += chunk_created
 		frappe.db.commit()  # nosemgrep: frappe-manual-commit -- persist completed-chunk progress; without this a mid-sync crash discards every Bank Transaction this run created
 
-		# Stop conditions (spec Section 5.4)
-		if chunk_txn_count == 0:
-			chunks_empty += 1
+		if detailed_logging:
 			logger.info(
-				f"Chunk {i + 1}: no data returned. Stopping backfill."
+				f"[{conn.name}] chunk {i + 1}/{len(chunks)}: "
+				f"accounts={len(accounts)} txns={chunk_txn_count} "
+				f"created={chunk_created} dup={chunk_dup} error={total_error} "
+				f"simplefin_errors={[frappe.utils.escape_html(e) for e in errors]}"
 			)
-			break
 
-		if chunk_created == 0 and total_dup > 0:
-			logger.info(
-				f"Chunk {i + 1}: all transactions already imported. "
-				f"Backfill complete."
-			)
-			break
-
+		# Rate-limit abort always takes precedence (spec Section 5.5).
 		if rate_limit_hit:
 			logger.warning(
 				f"Rate limit warning detected. Processed {i + 1}/{len(chunks)} chunks. "
@@ -271,9 +332,33 @@ def _do_sync(conn, sync_log) -> None:
 			)
 			break
 
-	# Update last_sync_end_date to the end of the FIRST (newest) chunk
+		# Stop conditions (spec Section 5.4). The empty-chunk stop is skipped
+		# only for an explicit Sync Full; the all-duplicate stop is skipped for
+		# any backfill-range walk so an interrupted full sync can resume past
+		# already-imported chunks to reach an older gap.
+		if chunk_txn_count == 0:
+			chunks_empty += 1
+			if not full_requested:
+				logger.info(
+					f"Chunk {i + 1}: no data returned. Stopping backfill."
+				)
+				break
+
+		elif chunk_created == 0 and chunk_dup > 0 and not (full_requested or backfill_range):
+			logger.info(
+				f"Chunk {i + 1}: all transactions already imported. "
+				f"Backfill complete."
+			)
+			break
+
+	# Update last_sync_end_date to the end of the FIRST (newest) chunk —
+	# unless a rate-limit abort left older chunks unfetched. Advancing then
+	# would orphan that range forever (later runs are incremental from "now"),
+	# so leave the old value in place and let the next run re-cover it;
+	# dedup makes the re-walk safe.
 	conn.reload()
-	conn.last_sync_end_date = end_ts
+	if not (rate_limit_hit and chunks_completed < len(chunks)):
+		conn.last_sync_end_date = end_ts
 	conn.save(ignore_permissions=True)
 
 	# Persist accumulated balance snapshots (child rows appended in the chunk
@@ -288,6 +373,7 @@ def _do_sync(conn, sync_log) -> None:
 	sync_log.transactions_skipped_pending = total_pending
 	sync_log.transactions_skipped_cancelled = total_cancelled
 	sync_log.transactions_mismatched = total_mismatch
+	sync_log.transactions_skipped_error = total_error
 	sync_log.chunks_completed = chunks_completed
 	sync_log.chunks_empty = chunks_empty
 	sync_log.rate_limit_warning_received = 1 if rate_limit_hit else 0
@@ -296,6 +382,24 @@ def _do_sync(conn, sync_log) -> None:
 			frappe.utils.escape_html(e) for e in all_simplefin_errors
 		)
 	sync_log.save(ignore_permissions=True)
+
+	# Empty-account monitoring (spec 9 item 2): flag active-mapped accounts that
+	# returned zero transactions across the whole run but have imported
+	# transactions on record. Only on an explicit Sync Full — on an incremental
+	# run a quiet account legitimately returns nothing and would spam
+	# notifications.
+	if full_requested and not rate_limit_hit:
+		mapping_names = {
+			m.simplefin_account_id: m.simplefin_account_name
+			for m in (conn.account_mappings or [])
+		}
+		for acct_id, count in txns_per_account.items():
+			if count == 0 and frappe.db.exists(
+				"Bank Transaction", {"simplefin_account_id": acct_id}
+			):
+				notify_empty_account(conn, mapping_names.get(acct_id) or acct_id)
+
+	return {"rate_limit_hit": rate_limit_hit, "error_count": total_error}
 
 
 # ---------------------------------------------------------------------------
@@ -325,7 +429,7 @@ def build_chunks(
 	end_ts: int,
 	max_days: int = 45,
 ) -> list[tuple[int, int]]:
-	"""Split a date range into ≤90-day chunks, newest first.
+	"""Split a date range into chunks of at most ``max_days`` days, newest first.
 
 	Returns a list of ``(chunk_start_ts, chunk_end_ts)`` tuples ordered
 	from most recent to oldest.
@@ -353,22 +457,33 @@ def _process_transaction(
 	conn,
 	mapping=None,
 ) -> str:
-	"""Process a single transaction. Returns 'created', 'duplicate', 'cancelled', or 'mismatch'."""
+	"""Process a single transaction.
+
+	Returns one of ``'created'``, ``'duplicate'``, ``'cancelled'``,
+	``'mismatch'``, ``'pending'`` (pending with no posted date yet), or
+	``'error'`` (malformed data or an insert/submit failure). An ``'error'``
+	result is counted separately and never aborts the sync.
+	"""
 	txn_id = txn.get("id")
 	if not txn_id:
 		logger.warning("Transaction missing 'id' field, skipping.")
-		return "duplicate"
+		return "error"
 
 	amount_str = txn.get("amount")
 	if not amount_str:
 		logger.warning(f"Transaction {txn_id} missing 'amount', skipping.")
-		return "duplicate"
+		return "error"
 
 	description = txn.get("description", "")
 	posted = txn.get("posted")
 	if not posted:
+		if txn.get("pending"):
+			# Pending transactions legitimately may not have a posted date
+			# yet — they cannot be imported, but they are not errors. They
+			# will import once the bank posts them.
+			return "pending"
 		logger.warning(f"Transaction {txn_id} missing 'posted', skipping.")
-		return "duplicate"
+		return "error"
 
 	# Dedup check — ALL docstatuses (spec Section 5.3)
 	existing = frappe.db.sql(
@@ -411,9 +526,9 @@ def _process_transaction(
 		differences = []
 		if str(record.date) != str(posted_date):
 			differences.append(f"date: {record.date} → {posted_date}")
-		if abs(float(record.deposit or 0) - new_deposit) > 0.01:
+		if abs(float(record.deposit or 0) - new_deposit) >= 0.005:
 			differences.append(f"deposit: {record.deposit} → {new_deposit}")
-		if abs(float(record.withdrawal or 0) - new_withdrawal) > 0.01:
+		if abs(float(record.withdrawal or 0) - new_withdrawal) >= 0.005:
 			differences.append(f"withdrawal: {record.withdrawal} → {new_withdrawal}")
 
 		if differences:
@@ -429,11 +544,14 @@ def _process_transaction(
 		amount = Decimal(amount_str)
 	except InvalidOperation:
 		logger.error(f"Transaction {txn_id}: invalid amount '{amount_str}', skipping.")
-		return "duplicate"
+		return "error"
 
 	deposit = float(abs(amount)) if amount > 0 else 0.0
 	withdrawal = float(abs(amount)) if amount < 0 else 0.0
 	abs_amount = float(abs(amount))
+
+	# Currency belongs to THIS account, not the connection's first mapping.
+	currency = (mapping.simplefin_currency if mapping and mapping.simplefin_currency else "USD")
 
 	posted_date = _unix_to_date(posted)
 	sanitized_desc = frappe.utils.escape_html(description)[:500] if description else ""
@@ -447,7 +565,7 @@ def _process_transaction(
 		"bank_account": bank_account,
 		"deposit": deposit,
 		"withdrawal": withdrawal,
-		"currency": conn.account_mappings[0].simplefin_currency if conn.account_mappings else "USD",
+		"currency": currency,
 		"description": sanitized_desc,
 		"reference_number": enriched.get("reference_number") or "",
 		"bank_party_name": enriched.get("bank_party_name") or "",
@@ -469,8 +587,18 @@ def _process_transaction(
 	if txn.get("pending"):
 		bt.simplefin_pending = 1
 
-	bt.insert(ignore_permissions=True)
-	bt.submit()
+	# Isolate insert/submit failures so one bad transaction (e.g. a validation
+	# error in ERPNext) is skipped and counted, never aborting the whole sync
+	# and wedging the connection on every future run. The savepoint keeps the
+	# surrounding chunk transaction usable after a rollback.
+	frappe.db.savepoint("sfin_txn")
+	try:
+		bt.insert(ignore_permissions=True)
+		bt.submit()
+	except Exception as exc:
+		frappe.db.rollback(save_point="sfin_txn")
+		logger.error(f"Transaction {txn_id}: failed to import: {exc}")
+		return "error"
 
 	return "created"
 
@@ -602,11 +730,19 @@ def _contains_rate_limit_warning(errors: list[str]) -> bool:
 
 
 def _activate_rate_limit_pause(conn) -> None:
-	"""Set rate_limit_paused_until to 01:00 UTC next day."""
+	"""Set rate_limit_paused_until to 01:00 UTC next day.
+
+	The moment is computed in UTC (SimpleFIN's quota day) but stored in the
+	site's timezone, because every consumer — scheduler, endpoints, client
+	JS — compares this naive value against site-local "now".
+	"""
+	from frappe.utils import convert_utc_to_system_timezone
+
 	tomorrow_start = (datetime.utcnow() + timedelta(days=1)).replace(
 		hour=0, minute=0, second=0, microsecond=0
 	)
-	pause_until = tomorrow_start + timedelta(hours=1)
+	pause_until_utc = tomorrow_start + timedelta(hours=1)
+	pause_until = convert_utc_to_system_timezone(pause_until_utc).replace(tzinfo=None)
 
 	conn.reload()
 	conn.rate_limit_paused_until = pause_until

@@ -34,6 +34,8 @@ def _make_conn(**kwargs) -> frappe._dict:
 		"retry_interval_minutes": 30,
 		"next_retry_at": None,
 		"rate_limit_paused_until": None,
+		"connection_status": "Active",
+		"modified": None,
 	}
 	defaults.update(kwargs)
 	return frappe._dict(defaults)
@@ -346,6 +348,86 @@ class TestEvaluateConnection(FrappeTestCase):
 		)
 		_evaluate_connection(conn, now)
 		mock_enqueue.assert_called_once_with(conn, reset_retries=True)
+
+
+# ---------------------------------------------------------------------------
+# _enqueue_sync + stale-Queued tests
+# ---------------------------------------------------------------------------
+
+class TestEnqueueSync(FrappeTestCase):
+	"""_enqueue_sync must NOT stamp last_sync_attempt: that field means "when a
+	run actually started" and the daily/weekly dedup relies on it — a job lost
+	from the queue must not count as today's attempt. Queued-state staleness is
+	measured from `modified` (refreshed by the enqueue set_value) instead."""
+
+	@patch("sync_simplefin.tasks.frappe")
+	def test_enqueue_does_not_stamp_last_sync_attempt(self, mock_frappe):
+		from sync_simplefin.tasks import _enqueue_sync
+
+		conn = _make_conn(name="SFIN-ENQ")
+		_enqueue_sync(conn, reset_retries=True)
+
+		mock_frappe.db.set_value.assert_called_once()
+		fields = mock_frappe.db.set_value.call_args[0][2]
+		self.assertEqual(fields["sync_state"], "Queued")
+		self.assertNotIn("last_sync_attempt", fields)
+
+
+class TestStaleQueuedRecovery(FrappeTestCase):
+	"""Queued staleness uses `modified` (enqueue time), not the previous run's
+	last_sync_attempt — which is >30 min old for every frequency and would
+	falsely fail freshly-queued jobs."""
+
+	@patch("sync_simplefin.tasks.frappe")
+	@patch("sync_simplefin.tasks._enqueue_sync")
+	def test_freshly_queued_not_recovered(self, mock_enqueue, mock_frappe):
+		"""Queued 2 min ago (modified) with an old last_sync_attempt → left alone."""
+		now = datetime(2026, 3, 24, 14, 0)
+		conn = _make_conn(
+			sync_state="Queued",
+			last_sync_attempt=datetime(2026, 3, 23, 2, 0),  # yesterday
+			modified=datetime(2026, 3, 24, 13, 58),  # just enqueued
+		)
+		_evaluate_connection(conn, now)
+		mock_frappe.db.set_value.assert_not_called()
+		mock_enqueue.assert_not_called()
+
+	@patch("sync_simplefin.tasks.frappe")
+	@patch("sync_simplefin.tasks._enqueue_sync")
+	def test_stale_queued_recovered(self, mock_enqueue, mock_frappe):
+		"""Queued >30 min ago (modified) → recovered to Failed."""
+		now = datetime(2026, 3, 24, 14, 0)
+		conn = _make_conn(
+			sync_state="Queued",
+			last_sync_attempt=datetime(2026, 3, 23, 2, 0),
+			modified=datetime(2026, 3, 24, 13, 0),  # 60 min ago
+		)
+		_evaluate_connection(conn, now)
+		mock_frappe.db.set_value.assert_called_once()
+		self.assertEqual(
+			mock_frappe.db.set_value.call_args[0][2]["sync_state"], "Failed"
+		)
+
+
+class TestExpiredPauseClearsStatus(FrappeTestCase):
+	"""Pause expiry must reset connection_status too — nothing else does if
+	subsequent syncs keep failing, leaving a phantom 'Rate Limited' display."""
+
+	@patch("sync_simplefin.tasks.frappe")
+	@patch("sync_simplefin.tasks._enqueue_sync")
+	def test_expired_pause_resets_rate_limited_status(self, mock_enqueue, mock_frappe):
+		now = datetime(2026, 3, 25, 2, 0)
+		conn = _make_conn(
+			sync_state="Idle",
+			rate_limit_paused_until=datetime(2026, 3, 25, 1, 0),  # expired
+			connection_status="Rate Limited",
+			last_sync_attempt=datetime(2026, 3, 23, 2, 0),
+		)
+		_evaluate_connection(conn, now)
+		mock_frappe.db.set_value.assert_any_call(
+			"SimpleFIN Connection", "SFIN-TEST",
+			{"rate_limit_paused_until": None, "connection_status": "Active"},
+		)
 
 
 # ---------------------------------------------------------------------------

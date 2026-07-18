@@ -45,7 +45,7 @@ def check_due_syncs() -> None:
 			"sync_day_of_week", "sync_day_of_month",
 			"last_sync_attempt", "retry_count", "retry_attempts_used",
 			"retry_interval_minutes", "next_retry_at",
-			"rate_limit_paused_until",
+			"rate_limit_paused_until", "connection_status", "modified",
 		],
 	)
 
@@ -91,16 +91,23 @@ def _evaluate_connection(conn, now) -> None:
 		paused_until = get_datetime(conn.rate_limit_paused_until)
 		if now < paused_until:
 			return  # Still paused — skip entirely
-		# Pause expired — clear it (auto-resume)
-		frappe.db.set_value(
-			"SimpleFIN Connection", conn.name,
-			{"rate_limit_paused_until": None},
-		)
+		# Pause expired — clear it (auto-resume). Reset the status too: it is
+		# set together with the pause, and nothing else resets it if the next
+		# syncs happen to fail, leaving a phantom "Rate Limited" display.
+		expiry_update = {"rate_limit_paused_until": None}
+		if conn.get("connection_status") == "Rate Limited":
+			expiry_update["connection_status"] = "Active"
+		frappe.db.set_value("SimpleFIN Connection", conn.name, expiry_update)
 
 	# CONCURRENCY / STALE STATE GUARD
+	# Syncing: measure from last_sync_attempt (stamped when the run started).
+	# Queued: the run never started, so measure from `modified` (refreshed by
+	# the enqueue set_value) — the previous run's attempt time would be stale
+	# by definition and falsely fail every freshly-queued job.
 	if conn.sync_state in ("Syncing", "Queued"):
-		if conn.last_sync_attempt:
-			elapsed = (now - get_datetime(conn.last_sync_attempt)).total_seconds()
+		reference = conn.last_sync_attempt if conn.sync_state == "Syncing" else conn.modified
+		if reference:
+			elapsed = (now - get_datetime(reference)).total_seconds()
 			if elapsed > STALE_THRESHOLD_SECONDS:
 				frappe.db.set_value(
 					"SimpleFIN Connection", conn.name,
@@ -200,8 +207,9 @@ def _is_weekly_due(now, last, hour: int, minute: int, day_of_week: str) -> bool:
 		return False
 	if last:
 		last_dt = get_datetime(last)
-		# Same ISO week?
-		if last_dt.isocalendar()[1] == now.isocalendar()[1] and last_dt.year == now.year:
+		# Same ISO week? Compare ISO (year, week) — the calendar year can differ
+		# from the ISO year around New Year, which the old check got wrong.
+		if last_dt.isocalendar()[:2] == now.isocalendar()[:2]:
 			return False
 	return True
 
@@ -237,7 +245,14 @@ def _is_monthly_due(now, last, hour: int, minute: int, day_of_month: int) -> boo
 # ---------------------------------------------------------------------------
 
 def _enqueue_sync(conn, reset_retries: bool) -> None:
-	"""Transition to Queued and enqueue the background sync job."""
+	"""Transition to Queued and enqueue the background sync job.
+
+	``last_sync_attempt`` is deliberately NOT stamped here — it means "when a
+	run actually started" (run_sync sets it), and the clock-based due checks
+	rely on that meaning: a job lost from the queue must not count as today's
+	attempt. Stale detection for the Queued state uses ``modified`` instead,
+	which this set_value refreshes.
+	"""
 	update_fields = {"sync_state": "Queued"}
 	if reset_retries:
 		update_fields["retry_attempts_used"] = 0

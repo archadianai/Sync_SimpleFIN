@@ -29,6 +29,7 @@
   "transactions_skipped_pending",
   "transactions_skipped_cancelled",
   "transactions_mismatched",
+  "transactions_skipped_error",
   "section_rate_limit",
   "rate_limit_warning_received",
   "section_errors",
@@ -185,6 +186,12 @@
    "fieldname": "transactions_mismatched",
    "fieldtype": "Int",
    "label": "Mismatched",
+   "read_only": 1
+  },
+  {
+   "fieldname": "transactions_skipped_error",
+   "fieldtype": "Int",
+   "label": "Skipped (Error)",
    "read_only": 1
   },
   {

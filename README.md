@@ -127,6 +127,10 @@ If a Bank Transaction is cancelled by mistake:
 
 Note: Cancelled transactions (docstatus=2) are intentionally retained in the dedup check to prevent unwanted re-imports. Deleting the record is what signals that a re-import is desired.
 
+## Deleting a Connection
+
+Deleting a SimpleFIN Connection **does not** delete its imported Bank Transactions or Sync Logs — they are retained as historical data. The connection reference on those records is cleared so they remain fully usable: unreconciled transactions stay visible in the Bank Reconciliation Tool and can still be reconciled. The SimpleFIN account and transaction IDs are kept on each Bank Transaction, so if you later re-create a connection to the same bank, dedup still recognizes the existing records and creates no duplicates.
+
 ## Permissions
 
 | Role | Connections | Sync Logs | Settings |

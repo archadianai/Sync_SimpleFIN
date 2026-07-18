@@ -15,6 +15,7 @@ All methods:
 from __future__ import annotations
 
 import base64
+import json
 from urllib.parse import urlparse
 
 import requests
@@ -57,6 +58,10 @@ class SimpleFINHTTPError(SimpleFINError):
 # ---------------------------------------------------------------------------
 
 REQUEST_TIMEOUT = 30  # seconds
+
+# Reject responses larger than this to protect the background worker from a
+# malicious or misbehaving endpoint returning a huge body.
+MAX_RESPONSE_BYTES = 25 * 1024 * 1024  # 25 MB
 
 
 # ---------------------------------------------------------------------------
@@ -116,7 +121,16 @@ class SimpleFINClient:
 		_enforce_https(claim_url)
 
 		try:
-			resp = requests.post(claim_url, timeout=REQUEST_TIMEOUT, verify=True)
+			# allow_redirects=False: a redirect would bypass the HTTPS check on
+			# the initial URL and could leak Basic-Auth over a downgrade. Treat
+			# any 3xx as an error (falls through to the non-200 branch below).
+			resp = requests.post(
+				claim_url,
+				timeout=REQUEST_TIMEOUT,
+				verify=True,
+				allow_redirects=False,
+				stream=True,
+			)
 		except requests.exceptions.Timeout:
 			raise SimpleFINNetworkError(_("Connection timed out while claiming token."))
 		except requests.exceptions.ConnectionError as exc:
@@ -133,9 +147,9 @@ class SimpleFINClient:
 			)
 
 		if resp.status_code != 200:
-			raise SimpleFINHTTPError(resp.status_code, resp.text)
+			raise SimpleFINHTTPError(resp.status_code, _read_error_snippet(resp))
 
-		access_url = resp.text.strip()
+		access_url = _read_capped(resp).strip()
 		if not access_url:
 			raise SimpleFINError(_("SimpleFIN returned an empty access URL."))
 
@@ -191,12 +205,16 @@ class SimpleFINClient:
 			params_list = list(params.items())
 
 		try:
+			# allow_redirects=False so a same-host https→http redirect can't
+			# silently downgrade and leak the Basic-Auth credential.
 			resp = requests.get(
 				url,
 				params=params_list,
 				auth=self._auth,
 				timeout=REQUEST_TIMEOUT,
 				verify=True,
+				allow_redirects=False,
+				stream=True,
 			)
 		except requests.exceptions.Timeout:
 			raise SimpleFINNetworkError(
@@ -218,10 +236,10 @@ class SimpleFINClient:
 			)
 
 		if resp.status_code != 200:
-			raise SimpleFINHTTPError(resp.status_code, resp.text)
+			raise SimpleFINHTTPError(resp.status_code, _read_error_snippet(resp))
 
 		try:
-			data = resp.json()
+			data = json.loads(_read_capped(resp))
 		except ValueError:
 			raise SimpleFINError(
 				_("Failed to parse SimpleFIN response as JSON.")
@@ -251,3 +269,44 @@ def _enforce_https(url: str) -> None:
 				parsed.scheme or "(empty)"
 			)
 		)
+
+
+def _read_capped(resp, limit: int = MAX_RESPONSE_BYTES) -> str:
+	"""Read a streamed response body, rejecting anything over ``limit`` bytes.
+
+	Requires the request to have been made with ``stream=True`` so the body is
+	read incrementally and a huge response never fully lands in memory.
+	"""
+	declared = resp.headers.get("Content-Length")
+	if declared is not None:
+		try:
+			if int(declared) > limit:
+				raise SimpleFINError(_("SimpleFIN response exceeds the size limit."))
+		except (TypeError, ValueError):
+			pass  # Malformed header — fall back to the streamed byte count.
+
+	total = 0
+	buf = bytearray()
+	for chunk in resp.iter_content(chunk_size=65536):
+		if not chunk:
+			continue
+		total += len(chunk)
+		if total > limit:
+			raise SimpleFINError(_("SimpleFIN response exceeds the size limit."))
+		buf.extend(chunk)
+
+	return buf.decode("utf-8", errors="replace")
+
+
+def _read_error_snippet(resp) -> str:
+	"""Read a short error-body excerpt without buffering a huge response.
+
+	Error messages only ever surface a few hundred characters, so cap the
+	read at 8 KB instead of the full data-path limit. An oversized error
+	body yields a fixed placeholder rather than an exception — the HTTP
+	status is the signal that matters on these paths.
+	"""
+	try:
+		return _read_capped(resp, limit=8192)[:500]
+	except SimpleFINError:
+		return "(error body too large)"

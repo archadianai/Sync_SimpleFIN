@@ -13,9 +13,10 @@ frappe.listview_settings["SimpleFIN Connection"] = {
 	add_fields: ["is_registered", "enabled", "last_sync_status", "rate_limit_paused_until"],
 
 	get_indicator(doc) {
-		// Rate Limited (takes priority)
+		// Rate Limited (takes priority). Parse via frappe.datetime — the
+		// space-separated datetime string is Invalid Date on WebKit/Safari.
 		if (doc.rate_limit_paused_until) {
-			const pause = new Date(doc.rate_limit_paused_until);
+			const pause = frappe.datetime.str_to_obj(doc.rate_limit_paused_until);
 			if (pause > new Date()) {
 				return [__("Rate Limited"), "orange", "rate_limit_paused_until,is,set"];
 			}
@@ -38,6 +39,10 @@ frappe.listview_settings["SimpleFIN Connection"] = {
 
 		if (doc.last_sync_status === "Failed") {
 			return [__("Failed"), "red", "last_sync_status,=,Failed"];
+		}
+
+		if (doc.last_sync_status === "Partial Success") {
+			return [__("Partial Success"), "orange", "last_sync_status,=,Partial Success"];
 		}
 
 		if (doc.last_sync_status === "Success") {

@@ -7,9 +7,9 @@ app_title = "Sync via SimpleFIN"
 app_publisher = "Steve Bourg"
 app_description = "Bank transaction sync via SimpleFIN Bridge for ERPNext"
 app_email = "steve@archadianai.com"
-app_version = "1.0.3"
+app_version = "1.0.4"
 app_license = "GPL-3.0"
-required_apps = ["erpnext"]
+required_apps = ["frappe", "erpnext"]
 
 app_include_css = "/assets/sync_simplefin/css/sync_simplefin.css"
 

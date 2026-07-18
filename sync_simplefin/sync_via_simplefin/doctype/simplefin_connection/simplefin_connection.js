@@ -146,13 +146,19 @@ frappe.ui.form.on("SimpleFIN Connection", {
 			frm.refresh_field("sync_time");
 		}
 
+		// The write-mutating actions call endpoints that enforce write
+		// permission server-side — hide their buttons from read-only users
+		// (e.g. Accounts User) instead of letting the click hit a
+		// PermissionError dialog. Test Connection only needs read.
+		let can_write = frm.perm && frm.perm[0] && frm.perm[0].write;
+
 		// --- Register / Re-register button ---
-		if (!frm.is_new() && !frm.doc.is_registered && frm.doc.setup_token) {
+		if (!frm.is_new() && !frm.doc.is_registered && frm.doc.setup_token && can_write) {
 			frm.add_custom_button(__("Register"), function () {
 				_do_register(frm);
 			}, __("Actions"));
 		}
-		if (!frm.is_new() && frm.doc.is_registered) {
+		if (!frm.is_new() && frm.doc.is_registered && can_write) {
 			frm.add_custom_button(__("Re-register"), function () {
 				_do_reregister(frm);
 			}, __("Actions"));
@@ -166,7 +172,7 @@ frappe.ui.form.on("SimpleFIN Connection", {
 		}
 
 		// --- Sync buttons ---
-		if (frm.doc.enabled) {
+		if (frm.doc.enabled && can_write) {
 			frm.add_custom_button(__("Sync Latest"), function () {
 				_do_sync_now(frm);
 			}, __("Actions"));
@@ -186,7 +192,7 @@ frappe.ui.form.on("SimpleFIN Connection", {
 		}
 
 		// --- Enable & Sync for registered + mapped but not enabled ---
-		if (!frm.is_new() && frm.doc.is_registered && !frm.doc.enabled && _has_mapped_accounts(frm)) {
+		if (!frm.is_new() && frm.doc.is_registered && !frm.doc.enabled && _has_mapped_accounts(frm) && can_write) {
 			frm.add_custom_button(__("Enable & Sync"), function () {
 				frm.set_value("enabled", 1);
 				frm.save().then(function () {
@@ -499,8 +505,20 @@ function _do_reregister(frm) {
 // Action button helpers (for existing connections)
 // ---------------------------------------------------------------------------
 
+// A pause only blocks actions while it is still in the future. An expired
+// pause is auto-cleared by the scheduler, so the buttons must not block on it.
+// NOTE: parse via frappe.datetime — new Date("YYYY-MM-DD HH:mm:ss") returns
+// Invalid Date on WebKit/Safari (space-separated format is not ISO 8601),
+// which would silently disable this guard there.
+function _rate_limit_active(doc) {
+	return (
+		doc.rate_limit_paused_until &&
+		frappe.datetime.str_to_obj(doc.rate_limit_paused_until) > new Date()
+	);
+}
+
 function _do_register(frm) {
-	if (frm.doc.rate_limit_paused_until) {
+	if (_rate_limit_active(frm.doc)) {
 		frappe.msgprint(
 			__("Connection is rate-limited until {0}.", [frm.doc.rate_limit_paused_until])
 		);
@@ -520,7 +538,7 @@ function _do_register(frm) {
 }
 
 function _do_test(frm) {
-	if (frm.doc.rate_limit_paused_until) {
+	if (_rate_limit_active(frm.doc)) {
 		frappe.msgprint(
 			__("Connection is rate-limited until {0}. Test blocked.", [
 				frm.doc.rate_limit_paused_until,
@@ -547,7 +565,7 @@ function _do_test(frm) {
 }
 
 function _do_sync_now(frm) {
-	if (frm.doc.rate_limit_paused_until) {
+	if (_rate_limit_active(frm.doc)) {
 		frappe.msgprint(
 			__("Connection is rate-limited until {0}. Sync blocked.", [
 				frm.doc.rate_limit_paused_until,
@@ -570,7 +588,7 @@ function _do_sync_now(frm) {
 }
 
 function _do_sync_full(frm) {
-	if (frm.doc.rate_limit_paused_until) {
+	if (_rate_limit_active(frm.doc)) {
 		frappe.msgprint(
 			__("Connection is rate-limited until {0}. Sync blocked.", [
 				frm.doc.rate_limit_paused_until,

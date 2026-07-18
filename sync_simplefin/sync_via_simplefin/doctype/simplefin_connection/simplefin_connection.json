@@ -275,7 +275,7 @@
    "fieldname": "last_sync_status",
    "fieldtype": "Select",
    "label": "Last Sync Status",
-   "options": "Success\nFailed\nNever Synced",
+   "options": "Success\nPartial Success\nFailed\nNever Synced",
    "read_only": 1
   },
   {

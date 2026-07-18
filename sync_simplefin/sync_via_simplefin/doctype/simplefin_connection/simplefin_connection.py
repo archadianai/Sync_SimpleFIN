@@ -31,8 +31,50 @@ class SimpleFINConnection(Document):
 		self._validate_enabled_requires_registration()
 		self._validate_sync_day_of_month()
 		self._validate_retry_window()
+		self._validate_account_mapping_regexes()
 		self._auto_activate_mapped_accounts()
 		self._compute_next_scheduled_sync()
+
+	def _validate_account_mapping_regexes(self) -> None:
+		"""Validate custom enrichment regexes on child mapping rows.
+
+		Frappe does not run a child doctype's own ``validate()`` on parent
+		save, so the regex check must be driven from here — otherwise invalid
+		patterns are accepted silently and later no-op at sync time.
+		"""
+		from sync_simplefin.utils.enrichment import validate_custom_regex
+
+		for m in (self.account_mappings or []):
+			if m.custom_reference_regex:
+				validate_custom_regex(m.custom_reference_regex, _("Custom Reference Regex"))
+			if m.custom_party_regex:
+				validate_custom_regex(m.custom_party_regex, _("Custom Party Regex"))
+
+	def on_trash(self) -> None:
+		"""Detach retained records before this connection is deleted.
+
+		Bank Transactions and Sync Logs are kept as historical data when a
+		connection is deleted (see ``ignore_links_on_delete`` in hooks.py),
+		but their Link fields must be cleared: Frappe validates link targets
+		on every document save, so a dangling reference would block bank
+		reconciliation (and any other post-submit edit) with
+		"Could not find SimpleFIN Connection". Direct DB updates are used
+		because the transactions are submitted and the fields read-only.
+		Traceability is preserved via simplefin_account_id and
+		simplefin_transaction_id, which are plain Data fields.
+		"""
+		frappe.db.set_value(
+			"Bank Transaction",
+			{"simplefin_connection": self.name},
+			"simplefin_connection",
+			None,
+		)
+		frappe.db.set_value(
+			"SimpleFIN Sync Log",
+			{"connection": self.name},
+			"connection",
+			None,
+		)
 
 	def _auto_activate_mapped_accounts(self) -> None:
 		"""Auto-set is_active=1 when an ERPNext Bank Account is assigned."""
@@ -193,6 +235,8 @@ def reregister(connection: str, setup_token: str) -> None:
 		SimpleFINError,
 	)
 
+	frappe.has_permission("SimpleFIN Connection", ptype="write", doc=connection, throw=True)
+
 	conn = frappe.get_doc("SimpleFIN Connection", connection)
 
 	if not conn.is_registered:
@@ -226,6 +270,8 @@ def register_token(connection: str) -> None:
 		SimpleFINClient,
 		SimpleFINError,
 	)
+
+	frappe.has_permission("SimpleFIN Connection", ptype="write", doc=connection, throw=True)
 
 	conn = frappe.get_doc("SimpleFIN Connection", connection)
 
@@ -265,6 +311,8 @@ def test_connection(connection: str) -> str:
 	"""Test the connection by fetching balances only. Returns formatted HTML."""
 	from sync_simplefin.utils.simplefin_client import SimpleFINClient, SimpleFINError
 
+	frappe.has_permission("SimpleFIN Connection", ptype="read", doc=connection, throw=True)
+
 	conn = frappe.get_doc("SimpleFIN Connection", connection)
 
 	if not conn.is_registered:
@@ -287,9 +335,10 @@ def test_connection(connection: str) -> str:
 
 	lines = [_("<b>Connection successful!</b> Found {0} account(s):").format(len(accounts)), "<br><br>"]
 	for acct in accounts:
-		name = acct.get("name", _("Unknown"))
-		currency = acct.get("currency", "")
-		balance = acct.get("balance", "N/A")
+		# Escape SimpleFIN-supplied strings — this HTML is rendered by msgprint.
+		name = frappe.utils.escape_html(acct.get("name") or _("Unknown"))
+		currency = frappe.utils.escape_html(acct.get("currency", ""))
+		balance = frappe.utils.escape_html(str(acct.get("balance", "N/A")))
 		lines.append(f"<b>{name}</b> ({currency}): {balance}<br>")
 
 	errors = data.get("errors", [])
@@ -301,13 +350,39 @@ def test_connection(connection: str) -> str:
 	return "".join(lines)
 
 
-@frappe.whitelist()
-def sync_now(connection: str) -> None:
-	"""Queue an immediate sync job for this connection."""
+def _sync_in_flight(conn) -> bool:
+	"""Return True when a sync job is genuinely queued or running.
+
+	A Syncing/Queued state older than the stale threshold means the worker
+	crashed or the job was lost — treat that as NOT in flight so the user can
+	manually recover immediately instead of waiting for the scheduler's
+	30-minute stale recovery. Re-queuing is safe: enqueue deduplicates on
+	job_id, so a genuinely-running job is never doubled.
+	"""
+	from sync_simplefin.tasks import STALE_THRESHOLD_SECONDS
+
+	if conn.sync_state not in ("Syncing", "Queued"):
+		return False
+
+	reference = conn.last_sync_attempt if conn.sync_state == "Syncing" else conn.modified
+	if not reference:
+		return False
+
+	elapsed = (now_datetime() - get_datetime(reference)).total_seconds()
+	return elapsed <= STALE_THRESHOLD_SECONDS
+
+
+def _request_sync(connection: str, full: bool) -> None:
+	"""Shared guard-and-enqueue path for the Sync Now / Sync Full endpoints."""
+	frappe.has_permission("SimpleFIN Connection", ptype="write", doc=connection, throw=True)
+
 	conn = frappe.get_doc("SimpleFIN Connection", connection)
 
 	if not conn.enabled:
 		frappe.throw(_("Connection is not enabled."))
+
+	if _sync_in_flight(conn):
+		frappe.throw(_("A sync is already in progress for this connection."))
 
 	if conn.rate_limit_paused_until and now_datetime() < conn.rate_limit_paused_until:
 		frappe.throw(
@@ -316,48 +391,33 @@ def sync_now(connection: str) -> None:
 			)
 		)
 
+	if full:
+		conn.last_sync_end_date = 0
 	conn.sync_state = "Queued"
 	conn.save(ignore_permissions=True)
 
 	frappe.enqueue(
 		"sync_simplefin.utils.sync.run_sync",
 		connection=conn.name,
+		full=full,
 		queue="long",
 		deduplicate=True,
 		job_id=f"sync_simplefin_{conn.name}",
 		timeout=600,
 		enqueue_after_commit=True,
 	)
+
+
+@frappe.whitelist()
+def sync_now(connection: str) -> None:
+	"""Queue an immediate incremental sync job for this connection."""
+	_request_sync(connection, full=False)
 
 
 @frappe.whitelist()
 def sync_full(connection: str) -> None:
-	"""Reset last_sync_end_date and queue a full history sync."""
-	conn = frappe.get_doc("SimpleFIN Connection", connection)
-
-	if not conn.enabled:
-		frappe.throw(_("Connection is not enabled."))
-
-	if conn.rate_limit_paused_until and now_datetime() < conn.rate_limit_paused_until:
-		frappe.throw(
-			_("Connection is rate-limited until {0}. Sync blocked.").format(
-				conn.rate_limit_paused_until
-			)
-		)
-
-	conn.last_sync_end_date = 0
-	conn.sync_state = "Queued"
-	conn.save(ignore_permissions=True)
-
-	frappe.enqueue(
-		"sync_simplefin.utils.sync.run_sync",
-		connection=conn.name,
-		queue="long",
-		deduplicate=True,
-		job_id=f"sync_simplefin_{conn.name}",
-		timeout=600,
-		enqueue_after_commit=True,
-	)
+	"""Reset last_sync_end_date and queue an explicit full-history sync."""
+	_request_sync(connection, full=True)
 
 
 @frappe.whitelist()
@@ -392,6 +452,8 @@ def wizard_register(connection_name: str, setup_token: str) -> dict:
 		SimpleFINClient,
 		SimpleFINError,
 	)
+
+	frappe.has_permission("SimpleFIN Connection", ptype="create", throw=True)
 
 	# Create the connection
 	conn = frappe.get_doc({
@@ -475,11 +537,22 @@ def wizard_save_mappings(connection: str, mappings: str) -> None:
 	"""
 	import json as _json
 
+	frappe.has_permission("SimpleFIN Connection", ptype="write", doc=connection, throw=True)
+
 	conn = frappe.get_doc("SimpleFIN Connection", connection)
-	mapping_list = _json.loads(mappings) if isinstance(mappings, str) else mappings
+
+	try:
+		mapping_list = _json.loads(mappings) if isinstance(mappings, str) else mappings
+	except (ValueError, TypeError):
+		frappe.throw(_("Invalid mappings payload."))
+
+	if not isinstance(mapping_list, list):
+		frappe.throw(_("Mappings must be a list."))
 
 	# Update each mapping row
 	for entry in mapping_list:
+		if not isinstance(entry, dict):
+			continue
 		acct_id = entry.get("simplefin_account_id")
 		bank_acct = entry.get("erpnext_bank_account")
 		if not acct_id:
