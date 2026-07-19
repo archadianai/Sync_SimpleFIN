@@ -20,7 +20,46 @@ from sync_simplefin.utils.simplefin_client import (
 )
 from sync_simplefin.utils.sync import run_sync
 
-BANK_ACCOUNT = "BECU Business Checking - BECU"
+
+def _ensure_bank_account() -> str:
+	"""Return a Bank Account name usable for test transactions.
+
+	Reuses an existing Bank Account when the site has one (dev sites);
+	otherwise provisions a minimal Company/Bank/Bank Account fixture (fresh
+	CI sites have none). Fixtures are left in place — CI sites are ephemeral.
+	"""
+	existing = frappe.get_all("Bank Account", pluck="name", limit=1)
+	if existing:
+		return existing[0]
+
+	company = frappe.get_all("Company", pluck="name", limit=1)
+	if company:
+		company = company[0]
+	else:
+		company = frappe.get_doc({
+			"doctype": "Company",
+			"company_name": "SFIN Test Company",
+			"abbr": "STC",
+			"country": "United States",
+			"default_currency": "USD",
+			"create_chart_of_accounts_based_on": "Standard Template",
+			"chart_of_accounts": "Standard",
+		}).insert(ignore_permissions=True).name
+
+	if not frappe.db.exists("Bank", "SFIN Test Bank"):
+		frappe.get_doc({"doctype": "Bank", "bank_name": "SFIN Test Bank"}).insert(
+			ignore_permissions=True
+		)
+
+	ba = frappe.get_doc({
+		"doctype": "Bank Account",
+		"account_name": "SFIN Test Checking",
+		"bank": "SFIN Test Bank",
+		"company": company,
+		"is_company_account": 1,
+	}).insert(ignore_permissions=True)
+	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- fixture must survive run_sync's commits/rollbacks
+	return ba.name
 
 
 def _accounts_response(account_id, transactions=None, errors=None, currency="USD"):
@@ -48,6 +87,7 @@ class _RunSyncTestBase(FrappeTestCase):
 	def setUp(self):
 		self._connections = []
 		self._account_ids = []
+		self.bank_account = _ensure_bank_account()
 
 	def tearDown(self):
 		# Cancel + delete any Bank Transactions created under the test accounts.
@@ -177,7 +217,7 @@ class TestSyncFullBackfill(_RunSyncTestBase):
 					"simplefin_account_id": acct_id,
 					"simplefin_account_name": "Test Checking",
 					"simplefin_currency": "USD",
-					"erpnext_bank_account": BANK_ACCOUNT,
+					"erpnext_bank_account": self.bank_account,
 					"is_active": 1,
 				},
 			],
@@ -187,7 +227,7 @@ class TestSyncFullBackfill(_RunSyncTestBase):
 		dup = frappe.get_doc({
 			"doctype": "Bank Transaction",
 			"date": "2026-06-15",
-			"bank_account": BANK_ACCOUNT,
+			"bank_account": self.bank_account,
 			"withdrawal": 150.0,
 			"deposit": 0,
 			"currency": "USD",
@@ -267,7 +307,7 @@ class TestPendingWithoutPosted(_RunSyncTestBase):
 				"simplefin_account_id": acct_id,
 				"simplefin_account_name": "Test Checking",
 				"simplefin_currency": "USD",
-				"erpnext_bank_account": BANK_ACCOUNT,
+				"erpnext_bank_account": self.bank_account,
 				"is_active": 1,
 			}],
 		)
@@ -309,7 +349,7 @@ class TestPartialSuccessOnConnection(_RunSyncTestBase):
 				"simplefin_account_id": acct_id,
 				"simplefin_account_name": "Test Checking",
 				"simplefin_currency": "USD",
-				"erpnext_bank_account": BANK_ACCOUNT,
+				"erpnext_bank_account": self.bank_account,
 				"is_active": 1,
 			}],
 		)

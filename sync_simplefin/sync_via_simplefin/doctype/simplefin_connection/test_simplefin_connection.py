@@ -7,6 +7,12 @@
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
+# Stop the test-record dependency walk at Bank Account: these tests provision
+# everything they need themselves, and following the link chain into ERPNext
+# reaches doctypes from the optional `payments` app (Payment Gateway), which
+# crashes `bench run-tests` on sites without it (e.g. CI).
+IGNORE_TEST_RECORD_DEPENDENCIES = ["Bank Account"]
+
 
 class TestConnectionDeletionDetachesRecords(FrappeTestCase):
 	"""Deleting a connection must clear Link fields on retained records.
