@@ -36,6 +36,13 @@ def _ensure_bank_account() -> str:
 	if company:
 		company = company[0]
 	else:
+		# Company.on_update creates default warehouses, one of which links
+		# Warehouse Type "Transit" — a setup-wizard fixture absent on a bare
+		# site. Provide it before creating the company.
+		if not frappe.db.exists("Warehouse Type", "Transit"):
+			frappe.get_doc({"doctype": "Warehouse Type", "__newname": "Transit"}).insert(
+				ignore_permissions=True
+			)
 		company = frappe.get_doc({
 			"doctype": "Company",
 			"company_name": "SFIN Test Company",
@@ -51,11 +58,42 @@ def _ensure_bank_account() -> str:
 			ignore_permissions=True
 		)
 
+	# A company Bank Account must link a GL account. Use the chart's bank
+	# leaf account, or create one under a suitable group.
+	gl_account = frappe.get_all(
+		"Account",
+		filters={"company": company, "account_type": "Bank", "is_group": 0},
+		pluck="name",
+		limit=1,
+	)
+	if gl_account:
+		gl_account = gl_account[0]
+	else:
+		parent = frappe.get_all(
+			"Account",
+			filters={"company": company, "account_type": "Bank", "is_group": 1},
+			pluck="name",
+			limit=1,
+		) or frappe.get_all(
+			"Account",
+			filters={"company": company, "root_type": "Asset", "is_group": 1},
+			pluck="name",
+			limit=1,
+		)
+		gl_account = frappe.get_doc({
+			"doctype": "Account",
+			"account_name": "SFIN Test Bank GL",
+			"parent_account": parent[0],
+			"company": company,
+			"account_type": "Bank",
+		}).insert(ignore_permissions=True).name
+
 	ba = frappe.get_doc({
 		"doctype": "Bank Account",
 		"account_name": "SFIN Test Checking",
 		"bank": "SFIN Test Bank",
 		"company": company,
+		"account": gl_account,
 		"is_company_account": 1,
 	}).insert(ignore_permissions=True)
 	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- fixture must survive run_sync's commits/rollbacks
